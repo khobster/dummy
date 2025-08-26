@@ -98,6 +98,17 @@
     .loading{display:inline-block;width:20px;height:20px;border:3px solid #e5e7eb;border-top-color:var(--dummy-red);border-radius:50%;animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
 
+    /* --- Goldilocks Hot List --- */
+    .hotlist{
+      display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+      gap:.6rem;margin-top:.6rem
+    }
+    .hotcard{
+      background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;
+      padding:.75rem .9rem;display:flex;justify-content:space-between;align-items:center
+    }
+    .hotcard .meta{font-size:.9rem;color:#475569}
+
     @media(max-width:768px){
       .tabs{top:76px}
       .arbitrage{grid-template-columns:1fr}
@@ -201,7 +212,15 @@
         <div class="legend-item"><span class="dot" style="background:#6366f1"></span>Too Cold &lt; 50°</div>
       </div>
 
+      <!-- Mode toggle -->
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .5rem">
+        <button class="season-btn active" id="btnSwaths" onclick="setGoldiMode('swaths')">Swaths</button>
+        <button class="season-btn" id="btnGradient" onclick="setGoldiMode('gradient')">Gradient</button>
+      </div>
+
       <div id="goldilocksMap" class="map-container"></div>
+      <!-- FOMO / enticing “go now” cards -->
+      <div id="goldilocksList" class="hotlist"></div>
     </div>
   </section>
 
@@ -242,12 +261,63 @@ const fmtTime = (isoOrDate)=>{
 
 // Magnus formula for dew point (F)
 function dewPointF(tempF, rh){
-  // Convert to C, compute dew C, convert back
   const T = (tempF - 32) * 5/9;
   const a = 17.625, b = 243.04;
   const gamma = Math.log(rh/100) + (a*T)/(b+T);
   const TdC = (b*gamma)/(a-gamma);
   return Math.round((TdC * 9/5) + 32);
+}
+
+/* ========= Color ramp + interpolation helpers (Gradient) ========= */
+const RAMP = [
+  {t:20,  c:[59,130,246]},   // blue
+  {t:40,  c:[99,102,241]},   // indigo
+  {t:55,  c:[16,185,129]},   // emerald
+  {t:70,  c:[52,211,153]},   // light-teal
+  {t:80,  c:[245,158,11]},   // amber
+  {t:95,  c:[239,68,68]},    // red
+  {t:100, c:[239,68,68]}
+];
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+function lerp(a,b,t){return a+(b-a)*t}
+function colorForTemp(tF, alpha=0.55){
+  const t = clamp(tF, RAMP[0].t, RAMP[RAMP.length-1].t);
+  let i=0; while(i<RAMP.length-1 && !(t>=RAMP[i].t && t<=RAMP[i+1].t)) i++;
+  const a=RAMP[i], b=RAMP[i+1];
+  const u=(t-a.t)/(b.t-a.t||1);
+  const r=Math.round(lerp(a.c[0],b.c[0],u));
+  const g=Math.round(lerp(a.c[1],b.c[1],u));
+  const bch=Math.round(lerp(a.c[2],b.c[2],u));
+  return `rgba(${r},${g},${bch},${alpha})`;
+}
+
+/* Fine grid for smoother interpolation */
+const FINE_LAT_STEP = 1.5;
+const FINE_LON_STEP = 2.0;
+function fineGridUSA(){
+  const pts=[];
+  for(let lat=25; lat<=49; lat+=FINE_LAT_STEP){
+    for(let lon=-124; lon<=-67; lon+=FINE_LON_STEP){
+      pts.push({lat:+lat.toFixed(2), lon:+lon.toFixed(2)});
+    }
+  }
+  return pts;
+}
+
+/* Quick & light IDW */
+function idwTemp(lat, lon, points, k=8, power=2){
+  const arr = points.map(p=>{
+    const dlat = lat - p.lat, dlon = lon - p.lon;
+    const d = Math.hypot(dlat, dlon);
+    return {d:d||1e-6, t:p.temp};
+  }).sort((a,b)=>a.d-b.d).slice(0,k);
+
+  let wSum=0, tSum=0;
+  for(const n of arr){
+    const w = 1/Math.pow(n.d,power);
+    wSum += w; tSum += w*n.t;
+  }
+  return tSum/(wSum||1);
 }
 
 /* ================== Weather Service ================== */
@@ -284,7 +354,7 @@ class DummyWeather {
 
             const data = {
               temp: now.temperature,
-              feelsLike: now.temperature, // NWS hourly lacks heat index; keep temp
+              feelsLike: now.temperature,
               humidity: rh,
               dew: dewGuess,
               windSpeed: parseInt(now.windSpeed)||0,
@@ -338,11 +408,10 @@ class DummyWeather {
     return data;
   }
 
-  // ===== Your hyperlocal addition (with elevation) =====
+  // ===== Hyperlocal (elevation adjust) =====
   async getHyperlocalWeather(lat, lon){
     const base = await this.getWeather(lat, lon);
-    const elevationFt = await this.getElevation(lat, lon);  // ft
-    // crude sea-level baseline; without grid elevation we treat 0 as reference
+    const elevationFt = await this.getElevation(lat, lon);
     const elevationAdjust = ((elevationFt - 0) / 1000) * -5.4;
     const adjustedTemp = Math.round(base.temp + elevationAdjust);
     return {...base, temp: adjustedTemp, precision:'Neighborhood-adjusted'};
@@ -358,6 +427,33 @@ class DummyWeather {
 /* ================== App State ================== */
 const weather = new DummyWeather();
 let userLocation=null, currentTab='hyperlocal', seasonMap=null, goldilocksMap=null;
+
+/* ============== Geocoding helpers with cache ============== */
+const geocodeCache=new Map();
+const cacheKey=(lat,lon)=>`${lat.toFixed(2)},${lon.toFixed(2)}`;
+
+// Prefer Open-Meteo reverse geocoder (fast & generous). Fallback: Nominatim.
+async function reverseTown(lat, lon){
+  const key=cacheKey(lat,lon);
+  if(geocodeCache.has(key)) return geocodeCache.get(key);
+  try{
+    const r=await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&count=1&language=en`);
+    if(r.ok){
+      const j=await r.json();
+      const g=j.results?.[0];
+      if(g){
+        const name=[g.name,g.admin1].filter(Boolean).join(', ');
+        geocodeCache.set(key,name); return name;
+      }
+    }
+  }catch{}
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+    const j=await r.json();
+    const name=j.address?.town||j.address?.city||j.address?.village||j.address?.county||key;
+    geocodeCache.set(key,name); return name;
+  }catch{ return key; }
+}
 
 /* ============== Geolocation & place label ============== */
 async function getUserLocation(){
@@ -420,25 +516,17 @@ async function updateHyperlocal(){
 }
 
 /* ================== Chase Season ================== */
-/* Sample a nationwide grid so we’re not limited to big cities */
+/* Coarse nationwide grid */
 function gridPointsUSA(){
   const pts=[];
   const latStart=25, latEnd=49, lonStart=-124, lonEnd=-67;
-  const latStep=3, lonStep=3.5; // ~56 points
+  const latStep=3, lonStep=3.5;
   for(let lat=latStart; lat<=latEnd; lat+=latStep){
     for(let lon=lonStart; lon<=lonEnd; lon+=lonStep){
       pts.push({lat:+lat.toFixed(2), lon:+lon.toFixed(2)});
     }
   }
   return pts;
-}
-
-async function reverseTown(lat,lon){
-  try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-    const j=await r.json();
-    return (j.address?.town||j.address?.city||j.address?.village||j.address?.county||`${lat.toFixed(2)}, ${lon.toFixed(2)}`);
-  }catch{return `${lat.toFixed(2)}, ${lon.toFixed(2)}`;}
 }
 
 async function findSeasonLocations(type){
@@ -457,33 +545,121 @@ async function findSeasonLocations(type){
       matches.push({lat:p.lat,lon:p.lon,temp:d.temp,dew:d.dew ?? dewPointF(d.temp,d.humidity)});
     }
   }));
-  // label only the first 12 with towns to keep API polite
-  const labeled = await Promise.all(matches.slice(0,12).map(async m=>{
-    const name = await reverseTown(m.lat,m.lon);
-    return {...m,name};
-  }));
-  return labeled;
+  return matches;
 }
 
-/* ================== Goldilocks ================== */
-async function updateGoldilocksMap(){
-  const pts = gridPointsUSA();
-  const payload = await Promise.all(pts.map(async p=>{
+/* ================== Goldilocks (swaths + gradient) ================== */
+let goldiMode = 'swaths';
+let tempSurfaceLayer = null;
+let goldiRects = [];
+
+async function computeGoldilocksCells(){
+  const pts = fineGridUSA();
+  return Promise.all(pts.map(async p=>{
     const d = await weather.getWeather(p.lat,p.lon);
-    const t = d.temp;
-    let color = '#6366f1'; // too cold
-    if(t>=65 && t<=75) color = 'var(--emerald)';
-    else if((t>=60 && t<65) || (t>75 && t<=80)) color = 'var(--teal)';
-    else if(t>=50 && t<60) color = 'var(--amber)';
-    else if(t>80) color = '#ef4444';
-    return {lat:p.lat, lon:p.lon, temp:t, color: color};
+    return { lat:p.lat, lon:p.lon, temp:d.temp, wind:d.windSpeed||0,
+             dew: d.dew ?? dewPointF(d.temp, d.humidity) };
   }));
-  payload.forEach(pt=>{
-    L.circleMarker([pt.lat,pt.lon],{
-      radius:10, fillColor:pt.color, color:'#fff', weight:2, fillOpacity:.85
-    }).bindPopup(`${pt.temp}°F`).addTo(goldilocksMap);
-  });
 }
+
+/* Canvas overlay for gradient surface */
+class TempSurface extends L.Layer{
+  constructor(){ super(); this._points=null; this._step=6; }
+  onAdd(map){
+    this._map=map;
+    this._canvas=L.DomUtil.create('canvas','dummy-temp-surface');
+    const size=map.getSize();
+    this._canvas.width=size.x; this._canvas.height=size.y;
+    map.getPanes().overlayPane.appendChild(this._canvas);
+    this._redraw = this._redraw.bind(this);
+    map.on('moveend zoomend resize', this._redraw);
+    this._redraw();
+  }
+  onRemove(map){
+    map.off('moveend zoomend resize', this._redraw);
+    L.DomUtil.remove(this._canvas);
+  }
+  setData(points){ this._points=points; this._redraw(); }
+  _redraw(){
+    if(!this._map || !this._canvas || !this._points) return;
+    const ctx=this._canvas.getContext('2d');
+    const size=this._map.getSize();
+    this._canvas.width=size.x; this._canvas.height=size.y;
+    ctx.clearRect(0,0,size.x,size.y);
+
+    const step=this._step;
+    for(let y=0; y<size.y; y+=step){
+      for(let x=0; x<size.x; x+=step){
+        const latlng=this._map.containerPointToLatLng([x+step/2,y+step/2]);
+        const lat=latlng.lat, lon=latlng.lng;
+        if(lat<24 || lat>50 || lon<-125 || lon>-66) continue; // limit to CONUS-ish
+        const t = idwTemp(lat,lon,this._points,8,2);
+        ctx.fillStyle = colorForTemp(t, 0.55);
+        ctx.fillRect(x,y,step,step);
+      }
+    }
+  }
+}
+
+async function updateGoldilocksMap(){
+  const cells = await computeGoldilocksCells();
+
+  if(goldiMode==='gradient'){
+    // remove swaths
+    goldiRects.forEach(r=>goldilocksMap.removeLayer(r));
+    goldiRects = [];
+
+    if(!tempSurfaceLayer){ tempSurfaceLayer = new TempSurface().addTo(goldilocksMap); }
+    tempSurfaceLayer.setData(cells.map(c=>({lat:c.lat,lon:c.lon,temp:c.temp})));
+
+  }else{
+    // remove gradient
+    if(tempSurfaceLayer){ goldilocksMap.removeLayer(tempSurfaceLayer); tempSurfaceLayer=null; }
+
+    // clear rectangles
+    goldiRects.forEach(r=>goldilocksMap.removeLayer(r));
+    goldiRects = [];
+
+    cells.forEach(c=>{
+      let color = '#6366f1'; // cold
+      if(c.temp>=65 && c.temp<=75) color='var(--emerald)';
+      else if((c.temp>=60&&c.temp<65)||(c.temp>75&&c.temp<=80)) color='var(--teal)';
+      else if(c.temp>=50&&c.temp<60) color='var(--amber)';
+      else if(c.temp>80) color='#ef4444';
+
+      const bounds=[[c.lat-FINE_LAT_STEP/2,c.lon-FINE_LON_STEP/2],[c.lat+FINE_LAT_STEP/2,c.lon+FINE_LON_STEP/2]];
+      const rect=L.rectangle(bounds,{stroke:false,fill:true,fillOpacity:.52,fillColor:color}).addTo(goldilocksMap);
+      rect.on('click', async ()=>{
+        const town = await reverseTown(c.lat,c.lon);
+        rect.bindPopup(`<strong>${town}</strong><br>${c.temp}°F • Dew ${c.dew}° • Wind ${c.wind} mph`).openPopup();
+      });
+      goldiRects.push(rect);
+    });
+  }
+
+  // Build FOMO list: best-feel perfect spots
+  const hot = cells
+    .filter(c=>c.temp>=65 && c.temp<=75)
+    .sort((a,b)=> (a.dew-b.dew) || (a.wind-b.wind))
+    .slice(0,8);
+  const named = await Promise.all(hot.map(async h=>({ ...h, town: await reverseTown(h.lat,h.lon) })));
+  const list = document.getElementById('goldilocksList');
+  list.innerHTML = named.map(n=>`
+    <div class="hotcard">
+      <div>
+        <div style="font-weight:800">${n.town}</div>
+        <div class="meta">Right now: ${n.temp}° • Dew ${n.dew}° • ${n.wind} mph</div>
+      </div>
+      <div style="font-weight:900;color:var(--dummy-red)">Go 👀</div>
+    </div>`).join('');
+}
+
+window.setGoldiMode = function(mode){
+  goldiMode = mode;
+  document.getElementById('btnSwaths').classList.toggle('active', mode==='swaths');
+  document.getElementById('btnGradient').classList.toggle('active', mode==='gradient');
+  if(goldilocksMap) updateGoldilocksMap();
+};
 
 /* ================== Arbitrage ================== */
 const CITIES = [
@@ -565,16 +741,27 @@ window.showSeason = async function(evt,type){
     });
   }
 
-  locs.forEach(loc=>{
+  // Name every result (limit to keep UI zippy)
+  const NAMING_LIMIT = 60;
+  const named = await Promise.all(locs.slice(0,NAMING_LIMIT).map(async loc=>{
+    const name = await reverseTown(loc.lat, loc.lon);
+    return {...loc, name};
+  }));
+
+  named.forEach(loc=>{
     L.circleMarker([loc.lat,loc.lon],{
-      radius:8, fillColor:'#dc2626', color:'#fff', weight:2, fillOpacity:.85
+      radius:9, fillColor:'#dc2626', color:'#fff', weight:2, fillOpacity:.9
     }).bindPopup(`<strong>${loc.name}</strong><br>${loc.temp}°F • Dew ${loc.dew}°`).addTo(seasonMap);
   });
 
-  if(locs.length){
-    results.innerHTML = `<h3 style="color:var(--dummy-red);margin:.5rem 0">${locs.length} good spots right now:</h3>` +
-      locs.map(l=>`<div class="pill" style="display:flex;justify-content:space-between;align-items:center">
-        <strong>${l.name}</strong><span style="color:var(--dummy-red);font-weight:900">${l.temp}°</span>
+  if(named.length){
+    results.innerHTML = `<h3 style="color:var(--dummy-red);margin:.5rem 0">${named.length} good spots right now:</h3>` +
+      named.map(l=>`<div class="hotcard">
+        <div>
+          <strong>${l.name}</strong>
+          <div class="meta">${l.temp}° • Dew ${l.dew}°</div>
+        </div>
+        <div style="font-weight:900;color:var(--dummy-red)">Save 💾</div>
       </div>`).join('');
   }else{
     results.innerHTML = `<div class="pill" style="text-align:center;color:var(--muted)">Nothing ideal at the moment — try another vibe.</div>`;
