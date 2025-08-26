@@ -69,7 +69,7 @@
     .dew-explain{margin-top:.5rem;font-size:.85rem;color:#475569;background:linear-gradient(90deg,#ecfeff,transparent);border-left:4px solid var(--teal);padding:.5rem .75rem;border-radius:10px}
 
     .timeline{display:flex;gap:.6rem;overflow:auto;padding:.5rem 0}
-    .bucket{min-width:110px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;padding:.75rem;text-align:center}
+    .bucket{min-width:128px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;padding:.75rem;text-align:center}
     .bucket strong{display:block;font-size:.95rem}
     .bucket .tval{font-size:1.6rem;font-weight:900;color:var(--dummy-red)}
     .badge{display:inline-block;margin-top:.25rem;padding:.15rem .5rem;border-radius:999px;font-size:.72rem;background:#fff;border:1px solid #e2e8f0}
@@ -108,6 +108,16 @@
       padding:.75rem .9rem;display:flex;justify-content:space-between;align-items:center
     }
     .hotcard .meta{font-size:.9rem;color:#475569}
+
+    /* Canvas overlay fix */
+    .dummy-temp-surface{
+      position:absolute;
+      top:0;
+      left:0;
+      pointer-events:none;
+      z-index:400;
+      image-rendering:auto;
+    }
 
     @media(max-width:768px){
       .tabs{top:76px}
@@ -159,7 +169,7 @@
         <div class="pill">
           <div class="metric" id="dew">--°</div>
           <div class="label">Dew Point</div>
-          <div class="dew-explain">
+          <div class="dew-explain" id="dewExplain">
             Dew point is the temp air must cool to for saturation. <strong>~55°F</strong> feels dry, <strong>60–65°</strong> a bit humid, <strong>70°+</strong> feels tropical.
           </div>
         </div>
@@ -173,8 +183,11 @@
         </div>
       </div>
 
-      <h3 style="color:var(--dummy-red);margin:.5rem 0 0.4rem">Next 6 Hours</h3>
+      <h3 style="color:var(--dummy-red);margin:.6rem 0 .35rem">Next 6 Hours</h3>
       <div id="timeline" class="timeline"></div>
+
+      <!-- Dew Insights -->
+      <div id="dewInsights" style="margin-top:.5rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:.75rem 1rem;color:#334155"></div>
 
       <div id="dataSource" class="badge" style="margin-top:.5rem">Source: loading…</div>
     </div>
@@ -259,6 +272,15 @@ const fmtTime = (isoOrDate)=>{
   return d.toLocaleTimeString('en-US',{hour:'numeric'}); // 12-hr like 3 PM
 };
 
+function dewFeeling(dp){
+  if(dp<50) return 'dry';
+  if(dp<56) return 'pleasant';
+  if(dp<61) return 'noticeably humid';
+  if(dp<66) return 'humid';
+  if(dp<71) return 'muggy';
+  return 'oppressive';
+}
+
 // Magnus formula for dew point (F)
 function dewPointF(tempF, rh){
   const T = (tempF - 32) * 5/9;
@@ -334,7 +356,7 @@ class DummyWeather {
       if(Date.now()-c.time < this.CACHE_DURATION) return c.data;
     }
 
-    // Try NOAA for conus
+    // Try NOAA for CONUS
     if(lat>24 && lat<50 && lon>-125 && lon<-66){
       try{
         const p = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`,{headers:{'User-Agent':'dummy.app (github pages)'}});
@@ -361,13 +383,20 @@ class DummyWeather {
               windGust: now.windGust ? parseInt(now.windGust) : null,
               precipProbNow: (now.probabilityOfPrecipitation && now.probabilityOfPrecipitation.value!=null) ? now.probabilityOfPrecipitation.value : null,
               description: now.shortForecast,
-              hourly: hours.map(h=>({
-                time:h.startTime,
-                temp:h.temperature,
-                wind: parseInt(h.windSpeed)||0,
-                pop: (h.probabilityOfPrecipitation && h.probabilityOfPrecipitation.value!=null) ? h.probabilityOfPrecipitation.value : null,
-                desc:h.shortForecast
-              })),
+              hourly: hours.map(h=>{
+                const hrh = h.relativeHumidity?.value ?? rh;
+                const hdew = (h.dewpoint && h.dewpoint.value!=null)
+                  ? Math.round((h.dewpoint.value * 9/5) + 32)
+                  : dewPointF(h.temperature, hrh);
+                return {
+                  time:h.startTime,
+                  temp:h.temperature,
+                  wind: parseInt(h.windSpeed)||0,
+                  pop: (h.probabilityOfPrecipitation && h.probabilityOfPrecipitation.value!=null) ? h.probabilityOfPrecipitation.value : null,
+                  desc:h.shortForecast,
+                  dew: hdew
+                };
+              }),
               source:'NOAA'
             };
             this.cache.set(key,{data,time:Date.now()});
@@ -432,7 +461,6 @@ let userLocation=null, currentTab='hyperlocal', seasonMap=null, goldilocksMap=nu
 const geocodeCache=new Map();
 const cacheKey=(lat,lon)=>`${lat.toFixed(2)},${lon.toFixed(2)}`;
 
-// Prefer Open-Meteo reverse geocoder (fast & generous). Fallback: Nominatim.
 async function reverseTown(lat, lon){
   const key=cacheKey(lat,lon);
   if(geocodeCache.has(key)) return geocodeCache.get(key);
@@ -493,30 +521,56 @@ async function updateHyperlocal(){
   if(!userLocation) return;
   const data = await weather.getHyperlocalWeather(userLocation.lat, userLocation.lon);
 
+  const nowDew = data.dew ?? dewPointF(data.temp, data.humidity);
   document.getElementById('temp').textContent = `${data.temp}°`;
   document.getElementById('feels').textContent = `${data.feelsLike}°`;
-  document.getElementById('dew').textContent = `${data.dew ?? dewPointF(data.temp, data.humidity)}°`;
+  document.getElementById('dew').textContent = `${nowDew}°`;
   document.getElementById('wind').textContent = `${data.windSpeed} mph`;
   document.getElementById('precipNow').textContent = (data.precipProbNow!=null ? data.precipProbNow : '—') + (data.precipProbNow!=null ? '%' : '');
 
+  // Dynamic dew explainer
+  const feel = dewFeeling(nowDew);
+  document.getElementById('dewExplain').innerHTML =
+    `Dew point is the temp air must cool to for saturation. Today feels <strong>${feel}</strong> at <strong>${nowDew}°</strong>. 
+     Quick guide: <strong>~55°</strong> dry • <strong>60–65°</strong> a bit humid • <strong>70°+</strong> tropical.`;
+
   document.getElementById('dataSource').textContent = `Source: ${data.source} • ${data.precision||'Best-available'}`;
 
+  // Timeline with dew, wind, precip
   const tl = document.getElementById('timeline'); tl.innerHTML='';
   (data.hourly||[]).forEach(h=>{
     const el=document.createElement('div');
     el.className='bucket';
+    const dp = h.dew ?? dewPointF(h.temp, data.humidity);
     el.innerHTML = `
       <strong>${fmtTime(h.time)}</strong>
       <div class="tval">${h.temp}°</div>
+      <div class="badge">Dew ${dp}°</div>
       <div class="badge">Wind ${h.wind ?? 0} mph</div>
       ${h.pop!=null ? `<div class="badge">${h.pop}% precip</div>`:''}
     `;
     tl.appendChild(el);
   });
+
+  // Dew insights summary (trend + worst hour + rain note)
+  if(data.hourly && data.hourly.length){
+    const dps = data.hourly.map(h=> h.dew ?? dewPointF(h.temp, data.humidity));
+    const trend = dps[dps.length-1] - dps[0];
+    const maxDP = Math.max(...dps);
+    const maxIdx = dps.indexOf(maxDP);
+    const maxTime = fmtTime(data.hourly[maxIdx].time);
+    const rainHour = data.hourly.find(h=> (h.pop??0) >= 50);
+    const rainNote = rainHour ? `Rain likely around <strong>${fmtTime(rainHour.time)}</strong> (~${rainHour.pop}%).` : `Low rain risk next 6h.`;
+
+    document.getElementById('dewInsights').innerHTML =
+      `Dew point ${trend>0 ? 'rising' : (trend<0 ? 'falling' : 'steady')} ${Math.abs(trend)}° through the next 6 hours. 
+       Muggiest hour peaks near <strong>${maxTime}</strong> (~<strong>${maxDP}°</strong>, ${dewFeeling(maxDP)}). ${rainNote}`;
+  }else{
+    document.getElementById('dewInsights').textContent = '';
+  }
 }
 
 /* ================== Chase Season ================== */
-/* Coarse nationwide grid */
 function gridPointsUSA(){
   const pts=[];
   const latStart=25, latEnd=49, lonStart=-124, lonEnd=-67;
@@ -609,26 +663,38 @@ async function updateGoldilocksMap(){
     goldiRects.forEach(r=>goldilocksMap.removeLayer(r));
     goldiRects = [];
 
-    if(!tempSurfaceLayer){ tempSurfaceLayer = new TempSurface().addTo(goldilocksMap); }
+    if(!tempSurfaceLayer){ 
+      tempSurfaceLayer = new TempSurface().addTo(goldilocksMap); 
+    }
     tempSurfaceLayer.setData(cells.map(c=>({lat:c.lat,lon:c.lon,temp:c.temp})));
 
   }else{
     // remove gradient
-    if(tempSurfaceLayer){ goldilocksMap.removeLayer(tempSurfaceLayer); tempSurfaceLayer=null; }
+    if(tempSurfaceLayer){ 
+      goldilocksMap.removeLayer(tempSurfaceLayer); 
+      tempSurfaceLayer=null; 
+    }
 
     // clear rectangles
     goldiRects.forEach(r=>goldilocksMap.removeLayer(r));
     goldiRects = [];
 
     cells.forEach(c=>{
-      let color = '#6366f1'; // cold
-      if(c.temp>=65 && c.temp<=75) color='var(--emerald)';
-      else if((c.temp>=60&&c.temp<65)||(c.temp>75&&c.temp<=80)) color='var(--teal)';
-      else if(c.temp>=50&&c.temp<60) color='var(--amber)';
-      else if(c.temp>80) color='#ef4444';
+      let color = '#6366f1'; // cold (indigo)
+      if(c.temp>=65 && c.temp<=75) color='#10b981';       // emerald
+      else if((c.temp>=60&&c.temp<65)||(c.temp>75&&c.temp<=80)) color='#14b8a6'; // teal
+      else if(c.temp>=50&&c.temp<60) color='#f59e0b';     // amber
+      else if(c.temp>80) color='#ef4444';                 // red
 
-      const bounds=[[c.lat-FINE_LAT_STEP/2,c.lon-FINE_LON_STEP/2],[c.lat+FINE_LAT_STEP/2,c.lon+FINE_LON_STEP/2]];
-      const rect=L.rectangle(bounds,{stroke:false,fill:true,fillOpacity:.52,fillColor:color}).addTo(goldilocksMap);
+      const bounds=[[c.lat-FINE_LAT_STEP/2,c.lon-FINE_LON_STEP/2],
+                     [c.lat+FINE_LAT_STEP/2,c.lon+FINE_LON_STEP/2]];
+      const rect=L.rectangle(bounds,{
+        stroke:false,
+        fill:true,
+        fillOpacity:.52,
+        fillColor:color
+      }).addTo(goldilocksMap);
+      
       rect.on('click', async ()=>{
         const town = await reverseTown(c.lat,c.lon);
         rect.bindPopup(`<strong>${town}</strong><br>${c.temp}°F • Dew ${c.dew}° • Wind ${c.wind} mph`).openPopup();
@@ -637,7 +703,7 @@ async function updateGoldilocksMap(){
     });
   }
 
-  // Build FOMO list: best-feel perfect spots
+  // FOMO list: best-feel perfect spots
   const hot = cells
     .filter(c=>c.temp>=65 && c.temp<=75)
     .sort((a,b)=> (a.dew-b.dew) || (a.wind-b.wind))
@@ -741,7 +807,7 @@ window.showSeason = async function(evt,type){
     });
   }
 
-  // Name every result (limit to keep UI zippy)
+  // Name results (limit for snappiness)
   const NAMING_LIMIT = 60;
   const named = await Promise.all(locs.slice(0,NAMING_LIMIT).map(async loc=>{
     const name = await reverseTown(loc.lat, loc.lon);
