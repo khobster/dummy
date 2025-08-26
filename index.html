@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dummy - Weather Where You Want It</title>
+  
+  <!-- Leaflet for maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <style>
+    :root {
+      --dummy-red: #dc2626;
+      --dummy-white: #ffffff;
+      --dummy-gray: #f3f4f6;
+      --text: #111827;
+      --muted: #6b7280;
+      --shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--dummy-gray);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    
+    /* Dummy Header with Daymark */
+    header {
+      background: var(--dummy-white);
+      padding: 1.5rem 2rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .daymark {
+      width: 40px;
+      height: 60px;
+      position: relative;
+      background: linear-gradient(
+        to bottom,
+        var(--dummy-red) 0%,
+        var(--dummy-red) 16.66%,
+        var(--dummy-white) 16.66%,
+        var(--dummy-white) 33.33%,
+        var(--dummy-red) 33.33%,
+        var(--dummy-red) 50%,
+        var(--dummy-white) 50%,
+        var(--dummy-white) 66.66%,
+        var(--dummy-red) 66.66%,
+        var(--dummy-red) 83.33%,
+        var(--dummy-white) 83.33%,
+        var(--dummy-white) 100%
+      );
+      clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+    }
+    
+    h1 {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: var(--dummy-red);
+    }
+    
+    .location-display {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--dummy-gray);
+      border-radius: 999px;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    
+    .location-display .dot {
+      width: 8px;
+      height: 8px;
+      background: var(--dummy-red);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Navigation Tabs */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0;
+      background: var(--dummy-white);
+      border-bottom: 3px solid var(--dummy-red);
+      overflow-x: auto;
+    }
+    
+    .tab {
+      padding: 1rem 2rem;
+      border: none;
+      background: var(--dummy-white);
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      position: relative;
+    }
+    
+    .tab:hover {
+      background: var(--dummy-gray);
+    }
+    
+    .tab.active {
+      color: var(--dummy-red);
+      background: var(--dummy-gray);
+    }
+    
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -3px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--dummy-red);
+    }
+    
+    /* Content Areas */
+    .content {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .section {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .section.active {
+      display: block;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .card {
+      background: var(--dummy-white);
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 2rem;
+    }
+    
+    .card h2 {
+      color: var(--dummy-red);
+      margin-bottom: 0.5rem;
+      font-size: 1.75rem;
+    }
+    
+    .card p {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    
+    /* Weather Cards */
+    .weather-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    
+    .weather-item {
+      padding: 1.5rem 1rem;
+      background: var(--dummy-gray);
+      border-radius: 0.75rem;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+    
+    .weather-item:hover {
+      transform: translateY(-2px);
+    }
+    
+    .weather-value {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: var(--dummy-red);
+    }
+    
+    .weather-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    /* Timeline */
+    .timeline {
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      padding: 1rem 0;
+    }
+    
+    .timeline-item {
+      min-width: 100px;
+      padding: 1rem;
+      background: var(--dummy-gray);
+      border-radius: 0.75rem;
+      text-align: center;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .timeline-item:hover {
+      border-color: var(--dummy-red);
+    }
+    
+    /* Season Controls */
+    .season-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    
+    .season-btn {
+      padding: 1rem;
+      border: 3px solid var(--dummy-gray);
+      background: white;
+      border-radius: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    
+    .season-btn:hover {
+      border-color: var(--dummy-red);
+      transform: translateY(-2px);
+    }
+    
+    .season-btn.active {
+      background: var(--dummy-red);
+      border-color: var(--dummy-red);
+      color: white;
+    }
+    
+    .season-btn .icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+    
+    /* Maps */
+    .map-container {
+      height: 500px;
+      border-radius: 1rem;
+      overflow: hidden;
+      margin: 2rem 0;
+      border: 3px solid var(--dummy-gray);
+    }
+    
+    /* Arbitrage */
+    .arbitrage-display {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 2rem;
+      align-items: center;
+      margin: 2rem 0;
+    }
+    
+    .location-card {
+      padding: 2rem;
+      background: var(--dummy-gray);
+      border-radius: 1rem;
+      text-align: center;
+    }
+    
+    .location-card h3 {
+      color: var(--dummy-red);
+      margin-bottom: 1rem;
+    }
+    
+    .temp-display {
+      font-size: 3rem;
+      font-weight: 900;
+      margin: 1rem 0;
+    }
+    
+    .vs-divider {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: var(--dummy-red);
+    }
+    
+    .spin-btn {
+      padding: 1.25rem 2.5rem;
+      background: var(--dummy-red);
+      color: white;
+      border: none;
+      border-radius: 999px;
+      font-size: 1.125rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 2rem auto;
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .spin-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(220, 38, 38, 0.3);
+    }
+    
+    .spin-btn:active {
+      transform: scale(0.95);
+    }
+    
+    .result-box {
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 700;
+      padding: 2rem;
+      background: var(--dummy-gray);
+      border-radius: 1rem;
+      margin: 2rem 0;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Loading states */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--dummy-gray);
+      border-top-color: var(--dummy-red);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .legend-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    
+    /* Data source badge */
+    .data-source {
+      position: absolute;
+      bottom: 1rem;
+      right: 1rem;
+      padding: 0.25rem 0.75rem;
+      background: rgba(255,255,255,0.9);
+      border-radius: 999px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 1.5rem; }
+      .header-content { flex-direction: column; gap: 1rem; }
+      .arbitrage-display { grid-template-columns: 1fr; }
+      .vs-divider { margin: 1rem 0; }
+      .content { padding: 1rem; }
+      .weather-value { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <div class="logo">
+        <div class="daymark"></div>
+        <h1>DUMMY</h1>
+      </div>
+      <div class="location-display">
+        <div class="dot"></div>
+        <span id="locationText">Finding you...</span>
+      </div>
+    </div>
+  </header>
+  
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('hyperlocal')">Hyperlocal</button>
+    <button class="tab" onclick="switchTab('chase')">Chase Season</button>
+    <button class="tab" onclick="switchTab('goldilocks')">Goldilocks</button>
+    <button class="tab" onclick="switchTab('arbitrage')">Arbitrage</button>
+  </nav>
+  
+  <div class="content">
+    <!-- Hyperlocal Weather -->
+    <div id="hyperlocal" class="section active">
+      <div class="card">
+        <h2>Your Exact Weather</h2>
+        <p>Precision forecast for your specific location</p>
+        
+        <div class="weather-grid">
+          <div class="weather-item">
+            <div class="weather-value" id="temp">--°</div>
+            <div class="weather-label">Temperature</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-value" id="feels">--°</div>
+            <div class="weather-label">Feels Like</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-value" id="humid">--%</div>
+            <div class="weather-label">Humidity</div>
+          </div>
+          <div class="weather-item">
+            <div class="weather-value" id="wind">-- mph</div>
+            <div class="weather-label">Wind</div>
+          </div>
+        </div>
+        
+        <h3 style="margin-top: 2rem; color: var(--dummy-red);">Next 6 Hours</h3>
+        <div class="timeline" id="timeline"></div>
+        
+        <div class="data-source" id="dataSource">Source: Loading...</div>
+      </div>
+    </div>
+    
+    <!-- Chase the Season -->
+    <div id="chase" class="section">
+      <div class="card">
+        <h2>Chase the Season</h2>
+        <p>Find where your perfect weather is happening right now</p>
+        
+        <div class="season-controls">
+          <button class="season-btn active" onclick="showSeason('beach')">
+            <span class="icon">🏖️</span>
+            Beach Weather
+          </button>
+          <button class="season-btn" onclick="showSeason('sweater')">
+            <span class="icon">🧥</span>
+            Sweater Weather
+          </button>
+          <button class="season-btn" onclick="showSeason('snow')">
+            <span class="icon">❄️</span>
+            Snow Day
+          </button>
+          <button class="season-btn" onclick="showSeason('firepit')">
+            <span class="icon">🔥</span>
+            Fire Pit Night
+          </button>
+        </div>
+        
+        <div class="map-container" id="seasonMap"></div>
+        <div id="seasonResults"></div>
+      </div>
+    </div>
+    
+    <!-- Goldilocks Zone -->
+    <div id="goldilocks" class="section">
+      <div class="card">
+        <h2>Goldilocks Zones</h2>
+        <p>Where it's "just right" across America</p>
+        
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #10b981;"></div>
+            <span>Perfect (65-75°F)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #f59e0b;"></div>
+            <span>Nice (60-65° or 75-80°)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: #dc2626;"></div>
+            <span>Too Hot/Cold</span>
+          </div>
+        </div>
+        
+        <div class="map-container" id="goldilocksMap"></div>
+      </div>
+    </div>
+    
+    <!-- Weather Arbitrage -->
+    <div id="arbitrage" class="section">
+      <div class="card">
+        <h2>Weather Arbitrage</h2>
+        <p>Your weather vs. a random city</p>
+        
+        <div class="arbitrage-display">
+          <div class="location-card">
+            <h3>YOU</h3>
+            <div class="temp-display" id="yourTemp">--°</div>
+            <div id="yourDetails" style="color: var(--muted);"></div>
+          </div>
+          
+          <div class="vs-divider">VS</div>
+          
+          <div class="location-card">
+            <h3 id="compareCity">???</h3>
+            <div class="temp-display" id="compareTemp">--°</div>
+            <div id="compareDetails" style="color: var(--muted);"></div>
+          </div>
+        </div>
+        
+        <div class="result-box" id="arbitrageResult">
+          Click spin to compare your weather!
+        </div>
+        
+        <button class="spin-btn" onclick="spinArbitrage()">Spin for New City</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Weather Service with smart API strategy
+    class DummyWeather {
+      constructor() {
+        this.cache = new Map();
+        this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+      }
+
+      async getWeather(lat, lon) {
+        const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+        
+        // Check cache first
+        if (this.cache.has(key)) {
+          const cached = this.cache.get(key);
+          if (Date.now() - cached.time < this.CACHE_DURATION) {
+            return cached.data;
+          }
+        }
+
+        // For USA locations, try NOAA first (no limits!)
+        if (lat > 24 && lat < 50 && lon > -125 && lon < -66) {
+          try {
+            const pointResponse = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`);
+            if (pointResponse.ok) {
+              const pointData = await pointResponse.json();
+              const forecastResponse = await fetch(pointData.properties.forecastHourly);
+              
+              if (forecastResponse.ok) {
+                const forecast = await forecastResponse.json();
+                const current = forecast.properties.periods[0];
+                
+                const data = {
+                  temp: current.temperature,
+                  feelsLike: current.temperature, // NOAA doesn't provide feels like
+                  humidity: current.relativeHumidity?.value || 50,
+                  windSpeed: parseInt(current.windSpeed) || 0,
+                  description: current.shortForecast,
+                  hourly: forecast.properties.periods.slice(0, 6).map(p => ({
+                    time: p.startTime,
+                    temp: p.temperature,
+                    description: p.shortForecast
+                  })),
+                  source: 'NOAA'
+                };
+                
+                this.cache.set(key, { data, time: Date.now() });
+                return data;
+              }
+            }
+          } catch(e) {
+            console.log('NOAA failed, falling back to Open-Meteo');
+          }
+        }
+
+        // Fallback to Open-Meteo for international or if NOAA fails
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        const data = {
+          temp: Math.round(result.current.temperature_2m),
+          feelsLike: Math.round(result.current.apparent_temperature),
+          humidity: result.current.relative_humidity_2m,
+          windSpeed: Math.round(result.current.wind_speed_10m),
+          code: result.current.weather_code,
+          hourly: result.hourly.time.slice(0, 6).map((time, i) => ({
+            time: time,
+            temp: Math.round(result.hourly.temperature_2m[i]),
+            code: result.hourly.weather_code[i]
+          })),
+          source: 'Open-Meteo'
+        };
+        
+        this.cache.set(key, { data, time: Date.now() });
+        return data;
+      }
+
+      async getRadar() {
+        const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+        const data = await response.json();
+        return data.radar.past[data.radar.past.length - 1];
+      }
+    }
+
+    // Cities for comparisons
+    const CITIES = [
+      {name: 'Miami, FL', lat: 25.7617, lon: -80.1918},
+      {name: 'Anchorage, AK', lat: 61.2181, lon: -149.9003},
+      {name: 'Phoenix, AZ', lat: 33.4484, lon: -112.0740},
+      {name: 'Seattle, WA', lat: 47.6062, lon: -122.3321},
+      {name: 'Denver, CO', lat: 39.7392, lon: -104.9903},
+      {name: 'Chicago, IL', lat: 41.8781, lon: -87.6298},
+      {name: 'New Orleans, LA', lat: 29.9511, lon: -90.0715},
+      {name: 'Boston, MA', lat: 42.3601, lon: -71.0589},
+      {name: 'San Francisco, CA', lat: 37.7749, lon: -122.4194},
+      {name: 'Minneapolis, MN', lat: 44.9778, lon: -93.2650},
+      {name: 'Las Vegas, NV', lat: 36.1699, lon: -115.1398},
+      {name: 'Portland, ME', lat: 43.6591, lon: -70.2568},
+      {name: 'Nashville, TN', lat: 36.1627, lon: -86.7816},
+      {name: 'Salt Lake City, UT', lat: 40.7608, lon: -111.8910},
+      {name: 'San Diego, CA', lat: 32.7157, lon: -117.1611},
+      {name: 'Detroit, MI', lat: 42.3314, lon: -83.0458},
+      {name: 'Houston, TX', lat: 29.7604, lon: -95.3698},
+      {name: 'Atlanta, GA', lat: 33.7490, lon: -84.3880},
+      {name: 'Portland, OR', lat: 45.5152, lon: -122.6784},
+      {name: 'Honolulu, HI', lat: 21.3099, lon: -157.8581}
+    ];
+
+    // App State
+    const weather = new DummyWeather();
+    let userLocation = null;
+    let currentTab = 'hyperlocal';
+    let seasonMap = null;
+    let goldilocksMap = null;
+
+    // Get user location
+    async function getUserLocation() {
+      return new Promise((resolve) => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              userLocation = {
+                lat: position.coords.latitude,
+                lon: position.coords.longitude
+              };
+              
+              // Simple reverse geocoding
+              fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lon}&format=json`)
+                .then(r => r.json())
+                .then(data => {
+                  const place = data.address?.city || data.address?.town || 'Your Location';
+                  document.getElementById('locationText').textContent = place;
+                })
+                .catch(() => {
+                  document.getElementById('locationText').textContent = `${userLocation.lat.toFixed(2)}°, ${userLocation.lon.toFixed(2)}°`;
+                });
+              
+              resolve(userLocation);
+            },
+            () => {
+              // Fallback to IP location
+              fetch('https://ipapi.co/json/')
+                .then(r => r.json())
+                .then(data => {
+                  userLocation = {lat: data.latitude, lon: data.longitude};
+                  document.getElementById('locationText').textContent = `${data.city}, ${data.region}`;
+                  resolve(userLocation);
+                })
+                .catch(() => {
+                  userLocation = {lat: 40.7128, lon: -74.0060};
+                  document.getElementById('locationText').textContent = 'New York, NY';
+                  resolve(userLocation);
+                });
+            }
+          );
+        } else {
+          userLocation = {lat: 40.7128, lon: -74.0060};
+          document.getElementById('locationText').textContent = 'New York, NY';
+          resolve(userLocation);
+        }
+      });
+    }
+
+    // Update hyperlocal
+    async function updateHyperlocal() {
+      if (!userLocation) return;
+      
+      const data = await weather.getWeather(userLocation.lat, userLocation.lon);
+      
+      document.getElementById('temp').textContent = data.temp + '°';
+      document.getElementById('feels').textContent = data.feelsLike + '°';
+      document.getElementById('humid').textContent = data.humidity + '%';
+      document.getElementById('wind').textContent = data.windSpeed + ' mph';
+      document.getElementById('dataSource').textContent = `Source: ${data.source}`;
+      
+      // Timeline
+      const timeline = document.getElementById('timeline');
+      timeline.innerHTML = '';
+      
+      if (data.hourly) {
+        data.hourly.forEach((hour, i) => {
+          const time = new Date(hour.time);
+          const item = document.createElement('div');
+          item.className = 'timeline-item';
+          item.innerHTML = `
+            <div style="font-weight: 700;">${time.getHours()}:00</div>
+            <div style="font-size: 1.75rem; margin: 0.5rem 0; color: var(--dummy-red);">${hour.temp}°</div>
+          `;
+          timeline.appendChild(item);
+        });
+      }
+    }
+
+    // Season finder
+    async function findSeasonLocations(type) {
+      const results = [];
+      const promises = CITIES.map(async (city) => {
+        const data = await weather.getWeather(city.lat, city.lon);
+        let match = false;
+        
+        switch(type) {
+          case 'beach':
+            match = data.temp >= 75 && data.temp <= 95 && data.humidity < 70;
+            break;
+          case 'sweater':
+            match = data.temp >= 55 && data.temp <= 68;
+            break;
+          case 'snow':
+            match = data.temp <= 35;
+            break;
+          case 'firepit':
+            match = data.temp >= 45 && data.temp <= 60;
+            break;
+        }
+        
+        if (match) {
+          results.push({
+            name: city.name,
+            temp: data.temp,
+            lat: city.lat,
+            lon: city.lon
+          });
+        }
+      });
+      
+      await Promise.all(promises);
+      return results;
+    }
+
+    // Weather Arbitrage
+    window.spinArbitrage = async function() {
+      if (!userLocation) return;
+      
+      const userWeather = await weather.getWeather(userLocation.lat, userLocation.lon);
+      const randomCity = CITIES[Math.floor(Math.random() * CITIES.length)];
+      const compareWeather = await weather.getWeather(randomCity.lat, randomCity.lon);
+      
+      document.getElementById('yourTemp').textContent = userWeather.temp + '°';
+      document.getElementById('yourDetails').textContent = `${userWeather.humidity}% humidity`;
+      
+      document.getElementById('compareCity').textContent = randomCity.name.toUpperCase();
+      document.getElementById('compareTemp').textContent = compareWeather.temp + '°';
+      document.getElementById('compareDetails').textContent = `${compareWeather.humidity}% humidity`;
+      
+      // Generate comparison
+      const diff = Math.abs(userWeather.temp - compareWeather.temp);
+      let result = '';
+      
+      if (userWeather.temp > compareWeather.temp) {
+        result = `You're ${diff}° warmer than ${randomCity.name}`;
+        if (diff > 30) result += ` — they're freezing!`;
+        else if (diff > 15) result += ` — you win this round`;
+      } else if (userWeather.temp < compareWeather.temp) {
+        result = `You're ${diff}° cooler than ${randomCity.name}`;
+        if (diff > 30) result += ` — they're melting!`;
+        else if (diff > 15) result += ` — grab a jacket`;
+      } else {
+        result = `Exact same temperature! Cosmic twins!`;
+      }
+      
+      // Add humidity context
+      if (Math.abs(userWeather.humidity - compareWeather.humidity) > 30) {
+        if (userWeather.humidity < compareWeather.humidity) {
+          result += ` (but way less sticky)`;
+        } else {
+result += ` (but you're dealing with more humidity)`;
+       }
+     }
+     
+     document.getElementById('arbitrageResult').textContent = result;
+   };
+
+   // Tab switching
+   window.switchTab = function(tab) {
+     currentTab = tab;
+     
+     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+     event.target.classList.add('active');
+     
+     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+     document.getElementById(tab).classList.add('active');
+     
+     // Initialize maps when needed
+     if (tab === 'chase' && !seasonMap) {
+       seasonMap = L.map('seasonMap').setView([39.8283, -98.5795], 4);
+       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+         attribution: '© OpenStreetMap'
+       }).addTo(seasonMap);
+     }
+     
+     if (tab === 'goldilocks' && !goldilocksMap) {
+       goldilocksMap = L.map('goldilocksMap').setView([39.8283, -98.5795], 4);
+       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+         attribution: '© OpenStreetMap'
+       }).addTo(goldilocksMap);
+       updateGoldilocksMap();
+     }
+   };
+
+   // Season display
+   window.showSeason = async function(type) {
+     document.querySelectorAll('.season-btn').forEach(b => b.classList.remove('active'));
+     event.target.classList.add('active');
+     
+     const resultsDiv = document.getElementById('seasonResults');
+     resultsDiv.innerHTML = '<div class="loading"></div> Finding locations...';
+     
+     const locations = await findSeasonLocations(type);
+     
+     // Clear existing markers
+     if (seasonMap) {
+       seasonMap.eachLayer(layer => {
+         if (layer instanceof L.Marker || layer instanceof L.CircleMarker) {
+           seasonMap.removeLayer(layer);
+         }
+       });
+     }
+     
+     // Add markers
+     locations.forEach(loc => {
+       const marker = L.circleMarker([loc.lat, loc.lon], {
+         radius: 8,
+         fillColor: '#dc2626',
+         color: 'white',
+         weight: 2,
+         fillOpacity: 0.8
+       }).bindPopup(`<strong>${loc.name}</strong><br>${loc.temp}°F`);
+       
+       marker.addTo(seasonMap);
+     });
+     
+     // Update results
+     if (locations.length > 0) {
+       resultsDiv.innerHTML = `<h3 style="color: var(--dummy-red); margin-bottom: 1rem;">Found ${locations.length} locations:</h3>`;
+       locations.forEach(loc => {
+         resultsDiv.innerHTML += `
+           <div style="padding: 1rem; margin: 0.5rem 0; background: var(--dummy-gray); border-radius: 0.5rem; display: flex; justify-content: space-between;">
+             <span style="font-weight: 700;">${loc.name}</span>
+             <span style="color: var(--dummy-red); font-weight: 900;">${loc.temp}°F</span>
+           </div>`;
+       });
+     } else {
+       resultsDiv.innerHTML = '<p style="text-align: center; color: var(--muted);">No locations match this criteria right now. Try another!</p>';
+     }
+   };
+
+   // Goldilocks map
+   async function updateGoldilocksMap() {
+     const cityPromises = CITIES.slice(0, 20).map(async (city) => {
+       const data = await weather.getWeather(city.lat, city.lon);
+       
+       let color = '#dc2626'; // too hot/cold
+       if (data.temp >= 65 && data.temp <= 75) {
+         color = '#10b981'; // perfect
+       } else if ((data.temp >= 60 && data.temp < 65) || (data.temp > 75 && data.temp <= 80)) {
+         color = '#f59e0b'; // nice
+       }
+       
+       return {
+         city: city.name,
+         lat: city.lat,
+         lon: city.lon,
+         temp: data.temp,
+         color: color
+       };
+     });
+     
+     const results = await Promise.all(cityPromises);
+     
+     results.forEach(result => {
+       L.circleMarker([result.lat, result.lon], {
+         radius: 12,
+         fillColor: result.color,
+         color: 'white',
+         weight: 2,
+         fillOpacity: 0.8
+       }).bindPopup(`<strong>${result.city}</strong><br>${result.temp}°F`).addTo(goldilocksMap);
+     });
+   }
+
+   // Initialize app
+   (async function init() {
+     await getUserLocation();
+     await updateHyperlocal();
+     
+     // Auto-refresh hyperlocal every 5 minutes
+     setInterval(() => {
+       if (currentTab === 'hyperlocal') {
+         updateHyperlocal();
+       }
+     }, 5 * 60 * 1000);
+   })();
+ </script>
+</body>
+</html>
