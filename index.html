@@ -4,10 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dummy - Weather's Weird Side</title>
-  
+
+  <!-- prevent favicon 404 -->
+  <link rel="icon" href="dummy_logo.png" />
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
+
   <style>
     :root {
       --red: #dc2626;
@@ -19,192 +22,62 @@
       --muted: #64748b;
       --card: #ffffff;
     }
-    
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { 
-      font-family: system-ui, -apple-system, sans-serif; 
-      background: var(--gray); 
-      color: var(--dark);
-    }
-    
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--gray); color: var(--dark); }
+
     header {
       background: var(--card);
       border-bottom: 3px solid var(--red);
       padding: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; z-index: 1000;
     }
-    
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    
-    .logo img {
-      height: 40px;
-      width: auto;
-    }
-    
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 900;
-      color: var(--red);
-      letter-spacing: -0.02em;
-    }
-    
-    .location-control {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      background: var(--gray);
-      padding: 0.5rem 1rem;
-      border-radius: 999px;
-    }
-    
-    .location-control input {
-      border: none;
-      background: none;
-      outline: none;
-      width: 200px;
-    }
-    
-    .tabs {
-      display: flex;
-      background: var(--card);
-      padding: 0.5rem;
-      gap: 0.5rem;
-    }
-    
-    .tab {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      background: transparent;
-      font-weight: 700;
-      cursor: pointer;
-      border-radius: 0.5rem;
-      transition: all 0.2s;
-    }
-    
+
+    .logo { display: flex; align-items: center; gap: 0.75rem; }
+    .logo img { height: 40px; width: auto; }
+    h1 { font-size: 1.5rem; font-weight: 900; color: var(--red); letter-spacing: -0.02em; }
+
+    .location-control { display: flex; gap: .5rem; align-items: center; background: var(--gray); padding: .5rem 1rem; border-radius: 999px; }
+    .location-control input { border: none; background: none; outline: none; width: 200px; }
+
+    .tabs { display: flex; background: var(--card); padding: .5rem; gap: .5rem; }
+    .tab { padding: .75rem 1.5rem; border: none; background: transparent; font-weight: 700; cursor: pointer; border-radius: .5rem; transition: .2s; }
     .tab:hover { background: var(--gray); }
-    .tab.active { 
-      background: var(--red); 
-      color: white;
-    }
-    
-    .content {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 1rem;
-    }
-    
+    .tab.active { background: var(--red); color: #fff; }
+
+    .content { max-width: 1200px; margin: 0 auto; padding: 1rem; }
     .section { display: none; }
     .section.active { display: block; }
-    
-    .card {
-      background: var(--card);
-      border-radius: 1rem;
-      padding: 1.5rem;
-      margin: 1rem 0;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-    
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-    }
-    
-    .metric {
-      text-align: center;
-      padding: 1rem;
-      background: var(--gray);
-      border-radius: 0.75rem;
-    }
-    
-    .metric-value {
-      font-size: 2rem;
-      font-weight: 900;
-      color: var(--red);
-    }
-    
-    .metric-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 0.25rem;
-    }
-    
-    .map {
-      height: 500px;
-      border-radius: 1rem;
-      overflow: hidden;
-      margin: 1rem 0;
-    }
-    
-    .insight {
-      background: linear-gradient(90deg, rgba(59,130,246,0.1), transparent);
-      border-left: 3px solid var(--blue);
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 0 0.5rem 0.5rem 0;
-    }
-    
-    .data-age {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      padding: 0.25rem 0.75rem;
-      background: rgba(255,255,255,0.9);
-      border-radius: 999px;
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-    
-    .twin-card {
-      background: var(--gray);
-      padding: 1rem;
-      border-radius: 0.75rem;
-      margin: 0.5rem 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .pressure-indicator {
-      display: inline-block;
-      padding: 0.25rem 0.75rem;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 0.875rem;
-      margin: 0.25rem;
-    }
-    
-    .high-pressure { background: #fee2e2; color: #dc2626; }
-    .low-pressure { background: #dbeafe; color: #3b82f6; }
-    
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(0,0,0,0.1);
-      border-top-color: var(--red);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    @media (max-width: 768px) {
+
+    .card { background: var(--card); border-radius: 1rem; padding: 1.5rem; margin: 1rem 0; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 1rem; margin: 1.5rem 0; }
+    .metric { text-align: center; padding: 1rem; background: var(--gray); border-radius: .75rem; }
+    .metric-value { font-size: 2rem; font-weight: 900; color: var(--red); }
+    .metric-label { font-size: .75rem; text-transform: uppercase; color: var(--muted); margin-top: .25rem; }
+
+    .map { height: 500px; border-radius: 1rem; overflow: hidden; margin: 1rem 0; }
+
+    .insight { background: linear-gradient(90deg, rgba(59,130,246,.1), transparent);
+      border-left: 3px solid var(--blue); padding: 1rem; margin: 1rem 0; border-radius: 0 .5rem .5rem 0; }
+
+    .data-age { position: absolute; top: 1rem; right: 1rem; padding: .25rem .75rem; background: rgba(255,255,255,.9);
+      border-radius: 999px; font-size: .75rem; color: var(--muted); }
+
+    .twin-card { background: var(--gray); padding: 1rem; border-radius: .75rem; margin: .5rem 0; display: flex; justify-content: space-between; align-items: center; }
+
+    .pressure-indicator { display:inline-block; padding:.25rem .75rem; border-radius:999px; font-weight:700; font-size:.875rem; margin:.25rem; }
+    .high-pressure { background:#fee2e2; color:#dc2626; }
+    .low-pressure  { background:#dbeafe; color:#3b82f6; }
+
+    .loading { display:inline-block; width:20px; height:20px; border:3px solid rgba(0,0,0,.1); border-top-color:var(--red); border-radius:50%;
+      animation:spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width:768px) {
       .location-control input { width: 120px; }
-      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metrics { grid-template-columns: repeat(2,1fr); }
       .logo img { height: 30px; }
     }
   </style>
@@ -224,10 +97,11 @@
 </header>
 
 <nav class="tabs">
-  <button class="tab active" onclick="switchTab('local')">Your Weather</button>
-  <button class="tab" onclick="switchTab('twins')">Weather Twins</button>
-  <button class="tab" onclick="switchTab('pressure')">Pressure Chase</button>
-  <button class="tab" onclick="switchTab('roulette')">Weather Roulette</button>
+  <!-- pass the event explicitly -->
+  <button class="tab active" onclick="switchTab(event,'local')">Your Weather</button>
+  <button class="tab" onclick="switchTab(event,'twins')">Weather Twins</button>
+  <button class="tab" onclick="switchTab(event,'pressure')">Pressure Chase</button>
+  <button class="tab" onclick="switchTab(event,'roulette')">Weather Roulette</button>
 </nav>
 
 <div class="content">
@@ -236,576 +110,358 @@
     <div class="card">
       <div class="data-age" id="dataAge">Data: -- min old</div>
       <h2>Your Exact Weather</h2>
-      <p style="color: var(--muted); margin-top: 0.5rem;">Click anywhere on map to change location</p>
-      
+      <p style="color: var(--muted); margin-top: .5rem;">Click anywhere on map to change location</p>
+
       <div class="metrics">
-        <div class="metric">
-          <div class="metric-value" id="temp">--°</div>
-          <div class="metric-label">Temperature</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value" id="wetbulb">--°</div>
-          <div class="metric-label">Wet Bulb</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value" id="dewpoint">--°</div>
-          <div class="metric-label">Dew Point</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value" id="vpd">-- kPa</div>
-          <div class="metric-label">VPD</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value" id="spread">--°</div>
-          <div class="metric-label">T-Td Spread</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value" id="pressure">-- mb</div>
-          <div class="metric-label">Pressure</div>
-        </div>
+        <div class="metric"><div class="metric-value" id="temp">--°</div><div class="metric-label">Temperature</div></div>
+        <div class="metric"><div class="metric-value" id="wetbulb">--°</div><div class="metric-label">Wet Bulb</div></div>
+        <div class="metric"><div class="metric-value" id="dewpoint">--°</div><div class="metric-label">Dew Point</div></div>
+        <div class="metric"><div class="metric-value" id="vpd">-- kPa</div><div class="metric-label">VPD</div></div>
+        <div class="metric"><div class="metric-value" id="spread">--°</div><div class="metric-label">T-Td Spread</div></div>
+        <div class="metric"><div class="metric-value" id="pressure">-- mb</div><div class="metric-label">Pressure</div></div>
       </div>
-      
-      <div class="insight" id="moistureInsight">
-        Analyzing moisture dynamics...
-      </div>
-      
-      <div class="insight" id="condensationRisk">
-        Condensation risk assessment...
-      </div>
-      
+
+      <div class="insight" id="moistureInsight">Analyzing moisture dynamics...</div>
+      <div class="insight" id="condensationRisk">Condensation risk assessment...</div>
+
       <div id="localMap" class="map"></div>
     </div>
   </section>
-  
+
   <!-- Weather Twins -->
   <section id="twins" class="section">
     <div class="card">
       <h2>Weather Twins</h2>
       <p style="color: var(--muted);">Places experiencing your exact weather profile right now</p>
-      
-      <div id="twinsList">
-        <p style="text-align: center; color: var(--muted);">Click the tab to search for twins...</p>
-      </div>
+      <div id="twinsList"><p style="text-align:center;color:var(--muted);">Click the tab to search for twins...</p></div>
       <div id="twinsMap" class="map"></div>
     </div>
   </section>
-  
+
   <!-- Pressure Chase -->
   <section id="pressure" class="section">
     <div class="card">
       <h2>Pressure Chase</h2>
       <p style="color: var(--muted);">Live atmospheric pressure systems - watch weather being born</p>
-      
       <div id="pressureMap" class="map"></div>
-      
-      <div id="pressureSystems">
-        <p style="text-align: center; color: var(--muted);">Click the tab to load pressure data...</p>
-      </div>
+      <div id="pressureSystems"><p style="text-align:center;color:var(--muted);">Click the tab to load pressure data...</p></div>
     </div>
   </section>
-  
+
   <!-- Weather Roulette -->
   <section id="roulette" class="section">
     <div class="card">
       <h2>Weather Roulette</h2>
       <p style="color: var(--muted);">Click anywhere on the map for a 3-way comparison</p>
-      
       <div id="rouletteMap" class="map"></div>
-      
-      <div id="rouletteResults">
-        <p style="text-align: center; color: var(--muted);">Click on the map to spin the weather roulette!</p>
-      </div>
+      <div id="rouletteResults"><p style="text-align:center;color:var(--muted);">Click on the map to spin the weather roulette!</p></div>
     </div>
   </section>
 </div>
 
 <script>
-// State
+/* ---------------- State ---------------- */
 let userLocation = {lat: 40.7128, lon: -74.0060};
 let maps = {};
 
-// Weather Service
+/* ---------------- Weather Service ---------------- */
 class Weather {
-  constructor() {
-    this.cache = new Map();
-    this.CACHE_TIME = 5 * 60 * 1000; // 5 minutes
-  }
-  
-  async get(lat, lon) {
-    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
-    const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.time < this.CACHE_TIME) {
-      return cached.data;
-    }
-    
-    // Skip NOAA for coordinates that are definitely outside US or over water
-    // This prevents most 404 errors
-    const useNOAA = lat > 24.5 && lat < 49.5 && lon > -125 && lon < -66.5 &&
-                    !(lat < 25.5 && lon < -81) && // Skip Florida Keys area
-                    !(lat > 42 && lon > -71); // Skip northern Atlantic
-    
-    if (useNOAA) {
-      try {
-        const point = await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`);
-        
-        if (point.ok) {
-          const pData = await point.json();
-          
-          if (pData.properties && pData.properties.observationStations) {
-            const obs = await fetch(pData.properties.observationStations);
-            
-            if (obs.ok) {
-              const stations = await obs.json();
-              
-              if (stations.features && stations.features.length > 0) {
-                const stationUrl = stations.features[0].properties.stationIdentifier;
-                const latest = await fetch(`https://api.weather.gov/stations/${stationUrl}/observations/latest`);
-                
-                if (latest.ok) {
-                  const data = await latest.json();
-                  const props = data.properties;
-                  
-                  if (props.temperature && props.dewpoint && props.barometricPressure) {
-                    const result = {
-                      temp: Math.round(props.temperature.value * 9/5 + 32),
-                      dewpoint: Math.round(props.dewpoint.value * 9/5 + 32),
+  constructor(){ this.cache=new Map(); this.CACHE_TIME=5*60*1000; }
+  async get(lat, lon){
+    const key=`${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const cached=this.cache.get(key);
+    if(cached && Date.now()-cached.time<this.CACHE_TIME) return cached.data;
+
+    const useNOAA = lat>24.5 && lat<49.5 && lon>-125 && lon<-66.5 &&
+                    !(lat<25.5 && lon<-81) && !(lat>42 && lon>-71);
+
+    if(useNOAA){
+      try{
+        const point=await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`);
+        if(point.ok){
+          const pData=await point.json();
+          if(pData.properties?.observationStations){
+            const obs=await fetch(pData.properties.observationStations);
+            if(obs.ok){
+              const stations=await obs.json();
+              if(stations.features?.length){
+                const stationId=stations.features[0].properties.stationIdentifier;
+                const latest=await fetch(`https://api.weather.gov/stations/${stationId}/observations/latest`);
+                if(latest.ok){
+                  const data=await latest.json();
+                  const props=data.properties;
+                  if(props.temperature && props.dewpoint && props.barometricPressure){
+                    const res={
+                      temp: Math.round(props.temperature.value*9/5+32),
+                      dewpoint: Math.round(props.dewpoint.value*9/5+32),
                       humidity: props.relativeHumidity?.value || 50,
-                      pressure: Math.round(props.barometricPressure.value / 100),
-                      wind: Math.round((props.windSpeed?.value || 0) * 2.237),
+                      pressure: Math.round(props.barometricPressure.value/100),
+                      wind: Math.round((props.windSpeed?.value || 0)*2.237),
                       timestamp: new Date(props.timestamp),
-                      source: 'NOAA'
+                      source:'NOAA'
                     };
-                    
-                    this.cache.set(key, {data: result, time: Date.now()});
-                    return result;
+                    this.cache.set(key,{data:res,time:Date.now()});
+                    return res;
                   }
                 }
               }
             }
           }
         }
-      } catch(e) {
-        // Silently fall back to Open-Meteo
-      }
+      }catch(e){ /* fallback below */ }
     }
-    
-    // Use Open-Meteo as primary or fallback
-    try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
-      const resp = await fetch(url);
-      
-      if (resp.ok) {
-        const data = await resp.json();
-        
-        const result = {
-          temp: Math.round(data.current.temperature_2m),
-          dewpoint: Math.round(data.current.dew_point_2m),
-          humidity: data.current.relative_humidity_2m,
-          pressure: Math.round(data.current.surface_pressure),
-          wind: Math.round(data.current.wind_speed_10m),
+
+    try{
+      const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const resp=await fetch(url);
+      if(resp.ok){
+        const d=await resp.json();
+        const res={
+          temp: Math.round(d.current.temperature_2m),
+          dewpoint: Math.round(d.current.dew_point_2m),
+          humidity: d.current.relative_humidity_2m,
+          pressure: Math.round(d.current.surface_pressure),
+          wind: Math.round(d.current.wind_speed_10m),
           timestamp: new Date(),
-          source: 'Open-Meteo'
+          source:'Open-Meteo'
         };
-        
-        this.cache.set(key, {data: result, time: Date.now()});
-        return result;
+        this.cache.set(key,{data:res,time:Date.now()});
+        return res;
       }
-    } catch(e) {
-      console.error('Weather fetch failed:', e);
-    }
-    
-    // Return dummy data if all else fails
-    return {
-      temp: 72,
-      dewpoint: 55,
-      humidity: 50,
-      pressure: 1013,
-      wind: 5,
-      timestamp: new Date(),
-      source: 'Fallback'
-    };
+    }catch(e){ console.error('Weather fetch failed:', e); }
+
+    return { temp:72, dewpoint:55, humidity:50, pressure:1013, wind:5, timestamp:new Date(), source:'Fallback' };
   }
 }
+const weather=new Weather();
 
-const weather = new Weather();
-
-// Calculate wet bulb temperature
-function wetBulb(tempF, rh) {
-  const tempC = (tempF - 32) * 5/9;
-  const wetBulbC = tempC * Math.atan(0.151977 * Math.sqrt(rh + 8.313659)) +
-    Math.atan(tempC + rh) - Math.atan(rh - 1.676331) +
-    0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.023101 * rh) - 4.686035;
-  return Math.round(wetBulbC * 9/5 + 32);
+/* ---------------- Calculations ---------------- */
+function wetBulb(tempF,rh){
+  const C=(tempF-32)*5/9;
+  const wb=C*Math.atan(0.151977*Math.sqrt(rh+8.313659)) + Math.atan(C+rh) - Math.atan(rh-1.676331) +
+           0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh) - 4.686035;
+  return Math.round(wb*9/5+32);
+}
+function vaporPressureDeficit(tempF,rh){
+  const C=(tempF-32)*5/9;
+  const svp=0.6108*Math.exp(17.27*C/(C+237.3));
+  const avp=svp*rh/100;
+  return (svp-avp).toFixed(2);
 }
 
-// Calculate VPD
-function vaporPressureDeficit(tempF, rh) {
-  const tempC = (tempF - 32) * 5/9;
-  const svp = 0.6108 * Math.exp(17.27 * tempC / (tempC + 237.3));
-  const avp = svp * rh / 100;
-  return (svp - avp).toFixed(2);
+/* ---------------- Local panel ---------------- */
+async function updateLocal(){
+  const d=await weather.get(userLocation.lat,userLocation.lon);
+  document.getElementById('temp').textContent=`${d.temp}°`;
+  document.getElementById('dewpoint').textContent=`${d.dewpoint}°`;
+  document.getElementById('wetbulb').textContent=`${wetBulb(d.temp,d.humidity)}°`;
+  document.getElementById('vpd').textContent=`${vaporPressureDeficit(d.temp,d.humidity)}`;
+  document.getElementById('spread').textContent=`${d.temp-d.dewpoint}°`;
+  document.getElementById('pressure').textContent=`${d.pressure}`;
+
+  const ageMin=Math.round((Date.now()-d.timestamp)/60000);
+  document.getElementById('dataAge').textContent=`Data: ${ageMin} min old (${d.source})`;
+
+  const spread=d.temp-d.dewpoint;
+  let moisture='';
+  if(spread<5) moisture='⚠️ Near saturation - fog/mist likely';
+  else if(spread<10) moisture='Very humid - condensation on cold surfaces';
+  else if(spread<20) moisture='Comfortable moisture levels';
+  else moisture='Dry air - static electricity likely';
+  const vpd=vaporPressureDeficit(d.temp,d.humidity);
+  document.getElementById('moistureInsight').innerHTML =
+    `<strong>Moisture Status:</strong> ${moisture}<br>
+     <strong>VPD ${vpd} kPa:</strong> ${vpd<0.5 ? 'Air is saturated' : vpd>2 ? 'Air is very thirsty' : 'Moderate moisture demand'}`;
+
+  const surfaces=[{name:'Windows',temp:d.temp-15},{name:'Walls',temp:d.temp-8},{name:'Metal objects',temp:d.temp-20}];
+  const risks=surfaces.filter(s=>s.temp<=d.dewpoint).map(s=>s.name);
+  document.getElementById('condensationRisk').innerHTML =
+    risks.length?`⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}`:`✓ <strong>No condensation risk</strong> - all surfaces above dew point`;
 }
 
-// Update local weather
-async function updateLocal() {
-  const data = await weather.get(userLocation.lat, userLocation.lon);
-  
-  // Update metrics
-  document.getElementById('temp').textContent = `${data.temp}°`;
-  document.getElementById('dewpoint').textContent = `${data.dewpoint}°`;
-  document.getElementById('wetbulb').textContent = `${wetBulb(data.temp, data.humidity)}°`;
-  document.getElementById('vpd').textContent = `${vaporPressureDeficit(data.temp, data.humidity)}`;
-  document.getElementById('spread').textContent = `${data.temp - data.dewpoint}°`;
-  document.getElementById('pressure').textContent = `${data.pressure}`;
-  
-  // Data age
-  const ageMin = Math.round((Date.now() - data.timestamp) / 60000);
-  document.getElementById('dataAge').textContent = `Data: ${ageMin} min old (${data.source})`;
-  
-  // Moisture insights
-  const spread = data.temp - data.dewpoint;
-  let moisture = '';
-  if (spread < 5) moisture = '⚠️ Near saturation - fog/mist likely';
-  else if (spread < 10) moisture = 'Very humid - condensation on cold surfaces';
-  else if (spread < 20) moisture = 'Comfortable moisture levels';
-  else moisture = 'Dry air - static electricity likely';
-  
-  document.getElementById('moistureInsight').innerHTML = `
-    <strong>Moisture Status:</strong> ${moisture}<br>
-    <strong>VPD ${vaporPressureDeficit(data.temp, data.humidity)} kPa:</strong> 
-    ${vaporPressureDeficit(data.temp, data.humidity) < 0.5 ? 'Air is saturated' : 
-      vaporPressureDeficit(data.temp, data.humidity) > 2 ? 'Air is very thirsty' : 
-      'Moderate moisture demand'}
-  `;
-  
-  // Condensation risk
-  const surfaces = [
-    {name: 'Windows', temp: data.temp - 15},
-    {name: 'Walls', temp: data.temp - 8},
-    {name: 'Metal objects', temp: data.temp - 20}
-  ];
-  
-  const risks = surfaces
-    .filter(s => s.temp <= data.dewpoint)
-    .map(s => s.name);
-  
-  document.getElementById('condensationRisk').innerHTML = risks.length > 0 ?
-    `⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}` :
-    `✓ <strong>No condensation risk</strong> - all surfaces above dew point`;
-}
+/* ---------------- Twins ---------------- */
+async function findTwins(){
+  const my=await weather.get(userLocation.lat,userLocation.lon);
+  const list=document.getElementById('twinsList');
+  list.innerHTML='<div class="loading" style="margin:20px auto;display:block;"></div>';
 
-// Find weather twins
-async function findTwins() {
-  const myWeather = await weather.get(userLocation.lat, userLocation.lon);
-  
-  const list = document.getElementById('twinsList');
-  list.innerHTML = '<div class="loading" style="margin: 20px auto; display: block;"></div>';
-  
-  // Clear previous markers
-  if (maps.twins) {
-    maps.twins.eachLayer((layer) => {
-      if (layer instanceof L.CircleMarker) {
-        maps.twins.removeLayer(layer);
-      }
-    });
+  if(maps.twins){
+    maps.twins.eachLayer(l=>{ if(l instanceof L.CircleMarker) maps.twins.removeLayer(l); });
   }
-  
-  // Sample grid across continental US only
-  const twins = [];
-  for(let lat = 26; lat <= 47; lat += 4) {
-    for(let lon = -122; lon <= -72; lon += 5) {
-      const w = await weather.get(lat, lon);
-      
-      // Calculate similarity
-      const tempDiff = Math.abs(w.temp - myWeather.temp);
-      const dewDiff = Math.abs(w.dewpoint - myWeather.dewpoint);
-      const pressDiff = Math.abs(w.pressure - myWeather.pressure) / 10;
-      
-      const similarity = tempDiff + dewDiff + pressDiff;
-      
-      if (similarity < 8) {
-        twins.push({lat, lon, weather: w, similarity});
-      }
+
+  const twins=[];
+  for(let lat=26; lat<=47; lat+=4){
+    for(let lon=-122; lon<=-72; lon+=5){
+      const w=await weather.get(lat,lon);
+      const sim=Math.abs(w.temp-my.temp)+Math.abs(w.dewpoint-my.dewpoint)+Math.abs(w.pressure-my.pressure)/10;
+      if(sim<8) twins.push({lat,lon,weather:w,similarity:sim});
     }
   }
-  
-  // Sort by similarity
-  twins.sort((a, b) => a.similarity - b.similarity);
-  
-  if (twins.length === 0) {
-    list.innerHTML = '<p style="text-align: center; color: var(--muted);">No close weather twins found. Your weather is unique!</p>';
-    return;
-  }
-  
-  // Display
-  list.innerHTML = twins.slice(0, 5).map(t => `
+  twins.sort((a,b)=>a.similarity-b.similarity);
+
+  if(!twins.length){ list.innerHTML='<p style="text-align:center;color:var(--muted);">No close weather twins found.</p>'; return; }
+
+  list.innerHTML=twins.slice(0,5).map(t=>`
     <div class="twin-card">
-      <div>
-        <strong>${t.lat.toFixed(1)}°N, ${Math.abs(t.lon).toFixed(1)}°W</strong><br>
-        ${t.weather.temp}°F / ${t.weather.dewpoint}° dew / ${t.weather.pressure} mb
-      </div>
-      <div style="color: var(--green); font-weight: bold;">
-        ${Math.round(100 - t.similarity * 10)}% match
-      </div>
-    </div>
-  `).join('');
-  
-  // Add to map
-  if (maps.twins) {
-    // Add user location
-    L.circleMarker([userLocation.lat, userLocation.lon], {
-      radius: 10,
-      color: '#dc2626',
-      fillOpacity: 0.8
-    }).bindPopup('Your location').addTo(maps.twins);
-    
-    // Add twins
-    twins.slice(0, 10).forEach(t => {
-      L.circleMarker([t.lat, t.lon], {
-        radius: 8,
-        color: '#10b981',
-        fillOpacity: 0.6
-      }).bindPopup(`Twin! ${t.weather.temp}°F / ${Math.round(100 - t.similarity * 10)}% match`).addTo(maps.twins);
+      <div><strong>${t.lat.toFixed(1)}°N, ${Math.abs(t.lon).toFixed(1)}°W</strong><br>${t.weather.temp}°F / ${t.weather.dewpoint}° dew / ${t.weather.pressure} mb</div>
+      <div style="color:var(--green);font-weight:bold;">${Math.round(100 - t.similarity*10)}% match</div>
+    </div>`).join('');
+
+  if(maps.twins){
+    L.circleMarker([userLocation.lat,userLocation.lon],{radius:10,color:'#dc2626',fillOpacity:.8}).bindPopup('Your location').addTo(maps.twins);
+    twins.slice(0,10).forEach(t=>{
+      L.circleMarker([t.lat,t.lon],{radius:8,color:'#10b981',fillOpacity:.6})
+        .bindPopup(`Twin! ${t.weather.temp}°F / ${Math.round(100 - t.similarity*10)}% match`).addTo(maps.twins);
     });
+    setTimeout(()=>maps.twins.invalidateSize(),0);
   }
 }
 
-// Track pressure systems
-async function trackPressure() {
-  const list = document.getElementById('pressureSystems');
-  list.innerHTML = '<div class="loading" style="margin: 20px auto; display: block;"></div>';
-  
-  // Clear previous markers
-  if (maps.pressure) {
-    maps.pressure.eachLayer((layer) => {
-      if (layer instanceof L.CircleMarker) {
-        maps.pressure.removeLayer(layer);
-      }
-    });
+/* ---------------- Pressure ---------------- */
+async function trackPressure(){
+  const list=document.getElementById('pressureSystems');
+  list.innerHTML='<div class="loading" style="margin:20px auto;display:block;"></div>';
+
+  if(maps.pressure){
+    maps.pressure.eachLayer(l=>{ if(l instanceof L.CircleMarker) maps.pressure.removeLayer(l); });
   }
-  
-  const systems = [];
-  
-  // Sample pressure across continental US
-  for(let lat = 26; lat <= 47; lat += 3) {
-    for(let lon = -122; lon <= -72; lon += 4) {
-      const w = await weather.get(lat, lon);
-      systems.push({lat, lon, pressure: w.pressure});
+
+  const systems=[];
+  for(let lat=26; lat<=47; lat+=3){
+    for(let lon=-122; lon<=-72; lon+=4){
+      const w=await weather.get(lat,lon);
+      systems.push({lat,lon,pressure:w.pressure});
     }
   }
-  
-  // Find extremes
-  systems.sort((a, b) => b.pressure - a.pressure);
-  const highs = systems.slice(0, 5);
-  const lows = systems.slice(-5).reverse();
-  
-  // Display
+  systems.sort((a,b)=>b.pressure-a.pressure);
+  const highs=systems.slice(0,5), lows=systems.slice(-5).reverse();
+
   list.innerHTML = `
     <h3>High Pressure Centers (Clear/Stable)</h3>
-    <div style="margin-bottom: 1rem;">
-      ${highs.map(h => `
-        <span class="pressure-indicator high-pressure">${h.pressure} mb at ${h.lat}°N, ${Math.abs(h.lon)}°W</span>
-      `).join('')}
-    </div>
-    
+    <div style="margin-bottom:1rem;">${highs.map(h=>`<span class="pressure-indicator high-pressure">${h.pressure} mb at ${h.lat}°N, ${Math.abs(h.lon)}°W</span>`).join('')}</div>
     <h3>Low Pressure Centers (Storms/Fronts)</h3>
-    <div>
-      ${lows.map(l => `
-        <span class="pressure-indicator low-pressure">${l.pressure} mb at ${l.lat}°N, ${Math.abs(l.lon)}°W</span>
-      `).join('')}
-    </div>
-  `;
-  
-  // Add to map
-  if (maps.pressure) {
-    highs.forEach(h => {
-      L.circleMarker([h.lat, h.lon], {
-        radius: 25,
-        color: '#dc2626',
-        fillOpacity: 0.3,
-        weight: 2
-      }).bindPopup(`<strong>HIGH</strong><br>${h.pressure} mb`).addTo(maps.pressure);
-    });
-    
-    lows.forEach(l => {
-      L.circleMarker([l.lat, l.lon], {
-        radius: 25,
-        color: '#3b82f6',
-        fillOpacity: 0.3,
-        weight: 2
-      }).bindPopup(`<strong>LOW</strong><br>${l.pressure} mb`).addTo(maps.pressure);
-    });
+    <div>${lows.map(l=>`<span class="pressure-indicator low-pressure">${l.pressure} mb at ${l.lat}°N, ${Math.abs(l.lon)}°W</span>`).join('')}</div>`;
+
+  if(maps.pressure){
+    highs.forEach(h=>L.circleMarker([h.lat,h.lon],{radius:25,color:'#dc2626',fillOpacity:.3,weight:2}).bindPopup(`<strong>HIGH</strong><br>${h.pressure} mb`).addTo(maps.pressure));
+    lows.forEach(l=>L.circleMarker([l.lat,l.lon],{radius:25,color:'#3b82f6',fillOpacity:.3,weight:2}).bindPopup(`<strong>LOW</strong><br>${l.pressure} mb`).addTo(maps.pressure));
+    setTimeout(()=>maps.pressure.invalidateSize(),0);
   }
 }
 
-// Weather roulette
-async function roulette(lat, lon) {
-  document.getElementById('rouletteResults').innerHTML = '<div class="loading" style="margin: 20px auto; display: block;"></div>';
-  
-  const clicked = await weather.get(lat, lon);
-  
-  // Find most different place
-  let maxDiff = 0;
-  let opposite = null;
-  
-  // Search in continental US
-  for(let testLat = 26; testLat <= 47; testLat += 5) {
-    for(let testLon = -122; testLon <= -72; testLon += 6) {
-      const w = await weather.get(testLat, testLon);
-      const diff = Math.abs(w.temp - clicked.temp) + Math.abs(w.dewpoint - clicked.dewpoint);
-      
-      if (diff > maxDiff) {
-        maxDiff = diff;
-        opposite = {lat: testLat, lon: testLon, weather: w};
-      }
+/* ---------------- Roulette ---------------- */
+async function roulette(lat,lon){
+  document.getElementById('rouletteResults').innerHTML='<div class="loading" style="margin:20px auto;display:block;"></div>';
+  const clicked=await weather.get(lat,lon);
+
+  let maxDiff=0, opposite=null;
+  for(let tLat=26; tLat<=47; tLat+=5){
+    for(let tLon=-122; tLon<=-72; tLon+=6){
+      const w=await weather.get(tLat,tLon);
+      const diff=Math.abs(w.temp-clicked.temp)+Math.abs(w.dewpoint-clicked.dewpoint);
+      if(diff>maxDiff){ maxDiff=diff; opposite={lat:tLat,lon:tLon,weather:w}; }
     }
   }
-  
-  // Random wildcard in continental US
-  const wildLat = 26 + Math.random() * 21;
-  const wildLon = -122 + Math.random() * 50;
-  const wildcard = await weather.get(wildLat, wildLon);
-  
-  // Display results
-  document.getElementById('rouletteResults').innerHTML = `
+  const wildLat=26+Math.random()*21, wildLon=-122+Math.random()*50;
+  const wildcard=await weather.get(wildLat,wildLon);
+
+  document.getElementById('rouletteResults').innerHTML=`
     <h3>📍 Your Click: ${lat.toFixed(1)}°N, ${Math.abs(lon).toFixed(1)}°W</h3>
-    <div class="twin-card">
-      <div>${clicked.temp}°F / ${clicked.dewpoint}° dew / ${clicked.pressure} mb</div>
-    </div>
-    
+    <div class="twin-card"><div>${clicked.temp}°F / ${clicked.dewpoint}° dew / ${clicked.pressure} mb</div></div>
     <h3>🔄 Weather Opposite: ${opposite.lat.toFixed(1)}°N, ${Math.abs(opposite.lon).toFixed(1)}°W</h3>
-    <div class="twin-card">
-      <div>${opposite.weather.temp}°F / ${opposite.weather.dewpoint}° dew / ${opposite.weather.pressure} mb</div>
-      <div style="color: var(--amber); font-weight: bold;">${maxDiff}° different!</div>
-    </div>
-    
+    <div class="twin-card"><div>${opposite.weather.temp}°F / ${opposite.weather.dewpoint}° dew / ${opposite.weather.pressure} mb</div>
+      <div style="color:var(--amber);font-weight:bold;">${maxDiff}° different!</div></div>
     <h3>🎲 Wildcard: ${wildLat.toFixed(1)}°N, ${Math.abs(wildLon).toFixed(1)}°W</h3>
-    <div class="twin-card">
-      <div>${wildcard.temp}°F / ${wildcard.dewpoint}° dew / ${wildcard.pressure} mb</div>
-    </div>
-  `;
+    <div class="twin-card"><div>${wildcard.temp}°F / ${wildcard.dewpoint}° dew / ${wildcard.pressure} mb</div></div>`;
 }
 
-// Initialize maps
-function initMaps() {
-  // Local map
-  maps.local = L.map('localMap').setView([userLocation.lat, userLocation.lon], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(maps.local);
-  
-  const localMarker = L.marker([userLocation.lat, userLocation.lon]).addTo(maps.local);
-  
-  maps.local.on('click', async (e) => {
-    userLocation = {lat: e.latlng.lat, lon: e.latlng.lng};
+/* ---------------- Maps ---------------- */
+function initMaps(){
+  maps.local = L.map('localMap').setView([userLocation.lat,userLocation.lon],8);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.local);
+  const localMarker=L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
+  maps.local.on('click', async e=>{
+    userLocation={lat:e.latlng.lat,lon:e.latlng.lng};
     localMarker.setLatLng(e.latlng);
-    document.getElementById('locationInput').value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    document.getElementById('locationInput').value=`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
     await updateLocal();
   });
-  
-  // Twins map
-  maps.twins = L.map('twinsMap').setView([39, -98], 4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(maps.twins);
-  
-  // Pressure map
-  maps.pressure = L.map('pressureMap').setView([39, -98], 4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(maps.pressure);
-  
-  // Roulette map
-  maps.roulette = L.map('rouletteMap').setView([39, -98], 4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(maps.roulette);
-  
-  maps.roulette.on('click', (e) => {
-    roulette(e.latlng.lat, e.latlng.lng);
-  });
+  // make sure it draws
+  setTimeout(()=>maps.local.invalidateSize(),0);
+
+  maps.twins = L.map('twinsMap').setView([39,-98],4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.twins);
+
+  maps.pressure = L.map('pressureMap').setView([39,-98],4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.pressure);
+
+  maps.roulette = L.map('rouletteMap').setView([39,-98],4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.roulette);
+  maps.roulette.on('click', e=>roulette(e.latlng.lat,e.latlng.lng));
 }
 
-// Tab switching
-window.switchTab = function(tab) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  
-  event.target.classList.add('active');
+/* ---------------- Tabs ---------------- */
+window.switchTab = function(evt, tab){
+  // sections
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
-  
-  // Invalidate map sizes when switching tabs
-  setTimeout(() => {
-    if (maps[tab]) {
-      maps[tab].invalidateSize();
-    }
-  }, 100);
-  
-  // Load data for tab
-  if (tab === 'twins') findTwins();
-  if (tab === 'pressure') trackPressure();
-}
 
-// Set location from input
-window.setLocation = async function() {
-  const input = document.getElementById('locationInput').value;
-  
-  // Try to parse coordinates (format: "lat, lon")
-  const coords = input.split(',').map(s => parseFloat(s.trim()));
-  if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-    userLocation = {lat: coords[0], lon: coords[1]};
-    
-    // Update local map
-    if (maps.local) {
-      maps.local.setView([userLocation.lat, userLocation.lon], 8);
-      maps.local.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          layer.setLatLng([userLocation.lat, userLocation.lon]);
-        }
-      });
+  // tabs
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  if(evt && evt.currentTarget){ evt.currentTarget.classList.add('active'); }
+  else {
+    // fallback if called programmatically
+    const btn = Array.from(document.querySelectorAll('.tabs .tab')).find(b=>b.textContent.trim().toLowerCase().includes(tab));
+    if(btn) btn.classList.add('active');
+  }
+
+  // fix Leaflet sizing after showing new container
+  setTimeout(()=>{ if(maps[tab]) maps[tab].invalidateSize(); }, 50);
+
+  // lazy-load data
+  if(tab==='twins') findTwins();
+  if(tab==='pressure') trackPressure();
+};
+
+/* ---------------- Location input ---------------- */
+window.setLocation = async function(){
+  const input=document.getElementById('locationInput').value;
+  const parts=input.split(',').map(s=>parseFloat(s.trim()));
+  if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){
+    userLocation={lat:parts[0],lon:parts[1]};
+    if(maps.local){
+      maps.local.setView([userLocation.lat,userLocation.lon],8);
+      maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
+      setTimeout(()=>maps.local.invalidateSize(),0);
     }
-    
     await updateLocal();
-  } else {
+  }else{
     alert('Please enter coordinates as: latitude, longitude (e.g., 40.7128, -74.0060)');
   }
-}
+};
 
-// Get user's location
-function getUserLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        userLocation = {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude
-        };
-        
-        document.getElementById('locationInput').value = 
-          `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-        
-        // Update map
-        if (maps.local) {
-          maps.local.setView([userLocation.lat, userLocation.lon], 8);
-          maps.local.eachLayer((layer) => {
-            if (layer instanceof L.Marker) {
-              layer.setLatLng([userLocation.lat, userLocation.lon]);
-            }
-          });
-        }
-        
-        await updateLocal();
-      },
-      (error) => {
-        console.log('Geolocation error:', error);
+/* ---------------- Geolocation ---------------- */
+function getUserLocation(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      userLocation={lat:pos.coords.latitude,lon:pos.coords.longitude};
+      document.getElementById('locationInput').value=`${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+      if(maps.local){
+        maps.local.setView([userLocation.lat,userLocation.lon],8);
+        maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
+        setTimeout(()=>maps.local.invalidateSize(),0);
       }
-    );
+      await updateLocal();
+    }, err=>{ console.log('Geolocation error:', err); });
   }
 }
 
-// Initialize
-window.addEventListener('DOMContentLoaded', () => {
+/* ---------------- Init ---------------- */
+window.addEventListener('DOMContentLoaded', ()=>{
   initMaps();
-  getUserLocation(); // Try to get user location
-  updateLocal(); // Use default location initially
+  getUserLocation();
+  updateLocal();
 });
+</script>
+</body>
+</html>
