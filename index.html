@@ -108,7 +108,7 @@
 
       <div class="insight" id="moistureInsight">Analyzing moisture dynamics...</div>
       <div class="insight" id="condensationRisk">Condensation risk assessment...</div>
-      <div class="insight" id="firepitHint">Checking tonight’s fire-pit potential…</div>
+      <div class="insight" id="firepitHint">Checking tonight's fire-pit potential…</div>
 
       <h3 style="margin-top:.5rem">Dew Point Forecast</h3>
       <p style="color:var(--muted);margin:.25rem 0 .5rem">Next 12 hours</p>
@@ -166,9 +166,9 @@ function approxUSLower48(lat, lon){
 }
 
 const geocodeCache=new Map();
-async function nameIfUSLand(lat, lon){
-  const key=`${lat.toFixed(3)},${lon.toFixed(3)}`;
-  if(geocodeCache.has(key)) return geocodeCache.get(key); // {name or null}
+async function nameIfUSLand(lat, lon, includeState=false){
+  const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${includeState}`;
+  if(geocodeCache.has(key)) return geocodeCache.get(key);
   try{
     const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1&accept-language=en&countrycodes=us`;
     const r=await fetch(url);
@@ -176,9 +176,17 @@ async function nameIfUSLand(lat, lon){
     const j=await r.json();
     const a=j.address||{};
     // disqualify clear water/ocean results
-    const label=(a.city||a.town||a.village||a.hamlet||a.county||a.state||'').toString();
     const waterWords=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];
-    if(!label || waterWords.some(w=>j.display_name?.includes(w))) { geocodeCache.set(key,null); return null; }
+    if(waterWords.some(w=>j.display_name?.includes(w))) { geocodeCache.set(key,null); return null; }
+    
+    let label=(a.city||a.town||a.village||a.hamlet||a.county||'').toString();
+    if(!label && a.state) label = a.state;
+    if(!label) { geocodeCache.set(key,null); return null; }
+    
+    if(includeState && a.state) {
+      label = `${label}, ${a.state}`;
+    }
+    
     geocodeCache.set(key,label);
     return label;
   }catch{
@@ -262,11 +270,28 @@ async function updateLocal(){
 
   const fc=await weather.hourly(userLocation.lat,userLocation.lon);
   const tl=document.getElementById('dewTimeline'); tl.innerHTML='';
-  fc.hours.slice(0,12).forEach(h=>{const el=document.createElement('div');el.className='bucket';el.innerHTML=`<strong>${fmtTime(h.time)}</strong><div class="tval">${h.dp}°</div><div class="mini">${(h.pop??'–')}% precip • ${h.wind} mph</div>`;tl.appendChild(el);});
+  
+  // Start from next hour
+  const now = new Date();
+  const currentHour = now.getHours();
+  let hoursToShow = [];
+  
+  // Find the index of the next hour in the forecast
+  for(let i = 0; i < fc.hours.length; i++) {
+    const hourTime = new Date(fc.hours[i].time);
+    if(hourTime.getHours() >= currentHour || hourTime.getDate() > now.getDate()) {
+      hoursToShow = fc.hours.slice(i, i + 12);
+      break;
+    }
+  }
+  
+  // If we didn't find hours (shouldn't happen), fall back to first 12
+  if(hoursToShow.length === 0) hoursToShow = fc.hours.slice(0, 12);
+  
+  hoursToShow.forEach(h=>{const el=document.createElement('div');el.className='bucket';el.innerHTML=`<strong>${fmtTime(h.time)}</strong><div class="tval">${h.dp}°</div><div class="mini">${(h.pop??'–')}% precip • ${h.wind} mph</div>`;tl.appendChild(el);});
   const days=document.getElementById('dewDays'); days.innerHTML='';
   fc.days.slice(0,5).forEach(dy=>{const el=document.createElement('div');el.className='bucket';el.innerHTML=`<strong>${dy.dow}</strong><div class="tval">${dy.min}° – ${dy.max}°</div><div class="mini">min / max dew</div>`;days.appendChild(el);});
 
-  const now=new Date();
   const tonight=fc.hours.filter(h=>{const t=new Date(h.time);return t.getDate()===now.getDate()&&t.getHours()>=18&&t.getHours()<=23;});
   if(tonight.length){
     const avgDP=Math.round(tonight.reduce((a,b)=>a+b.dp,0)/tonight.length);
@@ -375,8 +400,8 @@ async function trackPressure(){
   setTimeout(()=>maps.pressure.invalidateSize(),0);
 
   // Try to name a few (non-blocking UI already drawn)
-  const namedHighs=await Promise.all(highs.map(async h=>({...h,name:await nameIfUSLand(h.lat,h.lon)||`${h.lat.toFixed(2)},${h.lon.toFixed(2)}`})));
-  const namedLows =await Promise.all(lows .map(async l=>({...l,name:await nameIfUSLand(l.lat,l.lon)||`${l.lat.toFixed(2)},${l.lon.toFixed(2)}`})));
+  const namedHighs=await Promise.all(highs.map(async h=>({...h,name:await nameIfUSLand(h.lat,h.lon,true)||`${h.lat.toFixed(1)}°N, ${Math.abs(h.lon).toFixed(1)}°W`})));
+  const namedLows =await Promise.all(lows .map(async l=>({...l,name:await nameIfUSLand(l.lat,l.lon,true)||`${l.lat.toFixed(1)}°N, ${Math.abs(l.lon).toFixed(1)}°W`})));
 
   list.innerHTML = `
     <h3>High Pressure Centers (Calmer/Clear)</h3>
@@ -405,7 +430,7 @@ async function pickOppositeUS(clicked, grid){
   }
   sorted.sort((a,b)=>b.diff-a.diff);
   for(const cand of sorted){
-    const nm=await nameIfUSLand(cand.lat,cand.lon);
+    const nm=await nameIfUSLand(cand.lat,cand.lon,true);
     if(nm) return {...cand,name:nm};
   }
   return {...best,name:`${best.lat.toFixed(2)},${best.lon.toFixed(2)}`};
@@ -425,11 +450,11 @@ async function roulette(lat,lon){
   let wild=null;
   for(let attempts=0;attempts<50 && !wild; attempts++){
     const r=grid[Math.floor(Math.random()*grid.length)];
-    const nm=await nameIfUSLand(r.lat,r.lon);
+    const nm=await nameIfUSLand(r.lat,r.lon,true);
     if(nm){ const w=await weather.get(r.lat,r.lon); wild={lat:r.lat,lon:r.lon,weather:w,name:nm}; }
   }
 
-  const nameClick=await nameIfUSLand(lat,lon) || 'Your location';
+  const nameClick=await nameIfUSLand(lat,lon,true) || `${lat.toFixed(1)}°N, ${Math.abs(lon).toFixed(1)}°W`;
 
   if(!rouletteLayer) rouletteLayer=L.layerGroup().addTo(maps.roulette); else rouletteLayer.clearLayers();
   L.marker([lat,lon],{icon:emojiIcon('📍')}).bindPopup(`<strong>${nameClick}</strong><br>${clicked.temp}°F / ${clicked.dewpoint}° dew`).addTo(rouletteLayer);
