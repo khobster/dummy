@@ -421,6 +421,9 @@ async function pickOppositeUS(clicked, grid){
     const diff=Math.abs(w.temp-clicked.temp)+Math.abs(w.dewpoint-clicked.dewpoint);
     if(diff>bestDiff){ best={lat:p.lat,lon:p.lon,weather:w}; bestDiff=diff; }
   }
+  
+  if(!best) return null;
+  
   // ensure land/name; if not, find next that has a name
   const sorted=[];
   for(const p of grid){
@@ -433,7 +436,7 @@ async function pickOppositeUS(clicked, grid){
     const nm=await nameIfUSLand(cand.lat,cand.lon,true);
     if(nm) return {...cand,name:nm};
   }
-  return {...best,name:`${best.lat.toFixed(2)},${best.lon.toFixed(2)}`};
+  return best ? {...best,name:`${best.lat.toFixed(2)},${best.lon.toFixed(2)}`} : null;
 }
 
 async function roulette(lat,lon){
