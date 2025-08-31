@@ -166,32 +166,43 @@ function approxUSLower48(lat, lon){
 }
 
 const geocodeCache=new Map();
+let geocodeQueue = Promise.resolve();
+
 async function nameIfUSLand(lat, lon, includeState=false){
   const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${includeState}`;
   if(geocodeCache.has(key)) return geocodeCache.get(key);
-  try{
-    const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1&accept-language=en&countrycodes=us`;
-    const r=await fetch(url);
-    if(!r.ok) { geocodeCache.set(key,null); return null; }
-    const j=await r.json();
-    const a=j.address||{};
-    // disqualify clear water/ocean results
-    const waterWords=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];
-    if(waterWords.some(w=>j.display_name?.includes(w))) { geocodeCache.set(key,null); return null; }
+  
+  // Queue requests to avoid rate limiting
+  return geocodeQueue = geocodeQueue.then(async () => {
+    // Add delay between requests
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    let label=(a.city||a.town||a.village||a.hamlet||a.county||'').toString();
-    if(!label && a.state) label = a.state;
-    if(!label) { geocodeCache.set(key,null); return null; }
-    
-    if(includeState && a.state) {
-      label = `${label}, ${a.state}`;
+    try{
+      const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1&accept-language=en&countrycodes=us`;
+      const r=await fetch(url);
+      if(!r.ok) { geocodeCache.set(key,null); return null; }
+      const j=await r.json();
+      const a=j.address||{};
+      // disqualify clear water/ocean results
+      const waterWords=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];
+      if(waterWords.some(w=>j.display_name?.includes(w))) { geocodeCache.set(key,null); return null; }
+      
+      let label=(a.city||a.town||a.village||a.hamlet||a.county||'').toString();
+      if(!label && a.state) label = a.state;
+      if(!label) { geocodeCache.set(key,null); return null; }
+      
+      if(includeState && a.state) {
+        label = `${label}, ${a.state}`;
+      }
+      
+      geocodeCache.set(key,label);
+      return label;
+    }catch(e){
+      console.log('Geocode error, using coordinates');
+      geocodeCache.set(key,null); 
+      return null;
     }
-    
-    geocodeCache.set(key,label);
-    return label;
-  }catch{
-    geocodeCache.set(key,null); return null;
-  }
+  });
 }
 
 /* ========= Weather service ========= */
@@ -379,7 +390,7 @@ async function trackPressure(){
   }
   if(!systems.length){ list.innerHTML='<p style="text-align:center;color:var(--muted)">No pressure samples.</p>'; return; }
 
-  // Always show scatter field so it never looks blank
+  // Always show scatter field first so map isn't blank
   systems.forEach(s=>{
     L.circleMarker([s.lat,s.lon],{radius:4,color:'#64748b',fillColor:'#64748b',fillOpacity:.35,weight:0})
      .addTo(maps.pressure);
@@ -399,15 +410,45 @@ async function trackPressure(){
   });
   setTimeout(()=>maps.pressure.invalidateSize(),0);
 
-  // Try to name a few (non-blocking UI already drawn)
-  const namedHighs=await Promise.all(highs.map(async h=>({...h,name:await nameIfUSLand(h.lat,h.lon,true)||`${h.lat.toFixed(1)}°N, ${Math.abs(h.lon).toFixed(1)}°W`})));
-  const namedLows =await Promise.all(lows .map(async l=>({...l,name:await nameIfUSLand(l.lat,l.lon,true)||`${l.lat.toFixed(1)}°N, ${Math.abs(l.lon).toFixed(1)}°W`})));
-
+  // Show pressure values immediately with coordinates
   list.innerHTML = `
     <h3>High Pressure Centers (Calmer/Clear)</h3>
-    <div style="margin-bottom:1rem">${namedHighs.map(h=>`<span class="pressure-indicator high-pressure">${h.pressure} hPa — ${h.name}</span>`).join(' ')}</div>
+    <div style="margin-bottom:1rem">${highs.map(h=>`<span class="pressure-indicator high-pressure">${h.pressure} hPa — ${h.lat.toFixed(1)}°N, ${Math.abs(h.lon).toFixed(1)}°W</span>`).join(' ')}</div>
     <h3>Low Pressure Centers (Active/Stormy)</h3>
-    <div>${namedLows.map(l=>`<span class="pressure-indicator low-pressure">${l.pressure} hPa — ${l.name}</span>`).join(' ')}</div>`;
+    <div>${lows.map(l=>`<span class="pressure-indicator low-pressure">${l.pressure} hPa — ${l.lat.toFixed(1)}°N, ${Math.abs(l.lon).toFixed(1)}°W</span>`).join(' ')}</div>`;
+  
+  // Then try to get names for just the top 3 of each (with rate limiting)
+  const topHighs = highs.slice(0, 3);
+  const topLows = lows.slice(0, 3);
+  
+  Promise.all([
+    ...topHighs.map(async h => ({...h, name: await nameIfUSLand(h.lat, h.lon, true)})),
+    ...topLows.map(async l => ({...l, name: await nameIfUSLand(l.lat, l.lon, true)}))
+  ]).then(named => {
+    const namedHighs = named.slice(0, 3);
+    const namedLows = named.slice(3, 6);
+    
+    // Update with names where we got them
+    list.innerHTML = `
+      <h3>High Pressure Centers (Calmer/Clear)</h3>
+      <div style="margin-bottom:1rem">
+        ${highs.map((h, i) => {
+          const namedH = namedHighs.find(nh => nh.lat === h.lat && nh.lon === h.lon);
+          const label = namedH?.name || `${h.lat.toFixed(1)}°N, ${Math.abs(h.lon).toFixed(1)}°W`;
+          return `<span class="pressure-indicator high-pressure">${h.pressure} hPa — ${label}</span>`;
+        }).join(' ')}
+      </div>
+      <h3>Low Pressure Centers (Active/Stormy)</h3>
+      <div>
+        ${lows.map((l, i) => {
+          const namedL = namedLows.find(nl => nl.lat === l.lat && nl.lon === l.lon);
+          const label = namedL?.name || `${l.lat.toFixed(1)}°N, ${Math.abs(l.lon).toFixed(1)}°W`;
+          return `<span class="pressure-indicator low-pressure">${l.pressure} hPa — ${label}</span>`;
+        }).join(' ')}
+      </div>`;
+  }).catch(err => {
+    console.log('Some geocoding failed, using coordinates only');
+  });
 }
 
 /* ========= Roulette ========= */
