@@ -60,7 +60,6 @@
     .bucket .tval{font-size:1.2rem;font-weight:900;color:var(--red)}
     .bucket .mini{font-size:.7rem;color:#64748b}
 
-    /* Pure-emoji pins, no white disks */
     .emoji-pin{font-size:22px;line-height:22px;text-align:center;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))}
   </style>
 </head>
@@ -177,39 +176,131 @@ async function nameIfUSLand(lat, lon, includeState=false){
   });
 }
 
-/* ========= Weather service ========= */
+/* ========= Maths ========= */
+function dewPointF(tempF, rh){ // Magnus
+  const T=(tempF-32)*5/9, a=17.625, b=243.04;
+  const gamma=Math.log(rh/100)+(a*T)/(b+T);
+  const TdC=(b*gamma)/(a-gamma);
+  return Math.round(TdC*9/5+32);
+}
+function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.sqrt(rh+8.313659))+Math.atan(C+rh)-Math.atan(rh-1.676331)+0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)-4.686035;return Math.round(wb*9/5+32);}
+function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*rh/100;return (svp-avp).toFixed(2);}
+const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
+
+/* ========= Weather service (NOAA obs -> Open-Meteo fallback) ========= */
 class Weather{
   constructor(){ this.cache=new Map(); this.CACHE=5*60*1000; }
+  #key(lat,lon){ return `${lat.toFixed(3)},${lon.toFixed(3)}`; } // ~100m granularity
+
   async get(lat,lon){
-    const key=`${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const key=this.#key(lat,lon);
     const c=this.cache.get(key);
     if(c && Date.now()-c.t<this.CACHE) return c.d;
+
+    let best=null;
+
+    // 1) NOAA nearest station (US-only) — observation-grade dewpoint
+    if(approxUSLower48(lat,lon)){
+      try{
+        const p=await fetch(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`);
+        if(p.ok){
+          const pj=await p.json();
+          if(pj.properties?.observationStations){
+            const s=await fetch(pj.properties.observationStations);
+            if(s.ok){
+              const sj=await s.json();
+              if(Array.isArray(sj.features) && sj.features.length){
+                const nearest = this.#nearestStation(sj.features, lat, lon);
+                if(nearest){
+                  const obs=await fetch(`https://api.weather.gov/stations/${nearest.id}/observations/latest`);
+                  if(obs.ok){
+                    const oj=await obs.json();
+                    const props=oj.properties||{};
+                    const tempF = props.temperature?.value!=null ? (props.temperature.value*9/5+32) : null;
+                    const rh    = props.relativeHumidity?.value ?? null;
+                    const dpF   = props.dewpoint?.value!=null ? (props.dewpoint.value*9/5+32)
+                               : (tempF!=null && rh!=null ? dewPointF(tempF, rh) : null);
+                    const pressure = props.barometricPressure?.value!=null ? Math.round(props.barometricPressure.value/100) : null;
+                    if(dpF!=null){
+                      best={
+                        temp: tempF!=null ? Math.round(tempF) : undefined,
+                        dewpoint: Math.round(dpF),
+                        humidity: rh!=null ? Math.round(rh) : undefined,
+                        pressure: pressure ?? undefined,
+                        wind: props.windSpeed?.value!=null ? Math.round(props.windSpeed.value*2.237) : undefined,
+                        timestamp: props.timestamp ? new Date(props.timestamp) : new Date(),
+                        source:'NOAA (nearest station)'
+                      };
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }catch(e){ /* fall through to Open-Meteo */ }
+    }
+
+    // 2) Open-Meteo current (fallback or to fill missing fields)
+    let om=null;
     try{
       const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
       const r=await fetch(url);
       if(r.ok){
         const d=await r.json();
-        const out={
-          temp:Math.round(d.current.temperature_2m),
-          dewpoint:Math.round(d.current.dew_point_2m),
-          humidity:d.current.relative_humidity_2m,
-          pressure:Math.round(d.current.surface_pressure),
-          wind:Math.round(d.current.wind_speed_10m),
-          timestamp:new Date(),
-          source:'Open-Meteo'
+        om={
+          temp: Math.round(d.current.temperature_2m),
+          dewpoint: Math.round(d.current.dew_point_2m ?? dewPointF(d.current.temperature_2m, d.current.relative_humidity_2m)),
+          humidity: d.current.relative_humidity_2m,
+          pressure: Math.round(d.current.surface_pressure),
+          wind: Math.round(d.current.wind_speed_10m),
+          timestamp: new Date(),
+          source: 'Open-Meteo'
         };
-        this.cache.set(key,{d:out,t:Date.now()});
-        return out;
       }
-    }catch(e){ console.error(e); }
-    return {temp:72,dewpoint:55,humidity:50,pressure:1013,wind:5,timestamp:new Date(),source:'Fallback'};
+    }catch(e){}
+
+    // Merge: prefer NOAA dewpoint if present; fill gaps from OM
+    const merged = best
+      ? {
+          temp: best.temp ?? om?.temp ?? 72,
+          dewpoint: best.dewpoint,                // authoritative
+          humidity: best.humidity ?? om?.humidity ?? 50,
+          pressure: best.pressure ?? om?.pressure ?? 1013,
+          wind: best.wind ?? om?.wind ?? 5,
+          timestamp: best.timestamp ?? om?.timestamp ?? new Date(),
+          source: best.source + (om ? ' + OM fill' : '')
+        }
+      : (om ?? {temp:72,dewpoint:55,humidity:50,pressure:1013,wind:5,timestamp:new Date(),source:'Fallback'});
+
+    this.cache.set(key,{d:merged,t:Date.now()});
+    return merged;
   }
+
+  #nearestStation(features, lat, lon){
+    let best=null, bd=1e9;
+    for(const f of features){
+      const id=f.properties?.stationIdentifier;
+      const g=f.geometry?.coordinates; // [lon,lat]
+      if(!id || !g || g.length<2) continue;
+      const d=this.#haversine(lat,lon,g[1],g[0]);
+      if(d<bd){ bd=d; best={id,lat:g[1],lon:g[0],distKm:d}; }
+    }
+    return best;
+  }
+  #haversine(lat1,lon1,lat2,lon2){
+    const toRad=x=>x*Math.PI/180;
+    const R=6371, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+    const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+
   async hourly(lat,lon){
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=dew_point_2m,temperature_2m,wind_speed_10m,precipitation_probability,cloud_cover&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
     const r=await fetch(url); const j=await r.json();
     const hours=(j.hourly.time||[]).map((t,i)=>({
       time:t,
-      dp:Math.round(j.hourly.dew_point_2m?.[i]??NaN),
+      dp:Math.round(j.hourly.dew_point_2m?.[i] ?? dewPointF(j.hourly.temperature_2m?.[i]??NaN, j.current?.relative_humidity_2m ?? 60)),
       temp:Math.round(j.hourly.temperature_2m?.[i]??NaN),
       wind:Math.round(j.hourly.wind_speed_10m?.[i]??0),
       pop:j.hourly.precipitation_probability?.[i]??null,
@@ -220,12 +311,7 @@ class Weather{
 }
 const weather=new Weather();
 
-/* ========= Calcs ========= */
-function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.sqrt(rh+8.313659))+Math.atan(C+rh)-Math.atan(rh-1.676331)+0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)-4.686035;return Math.round(wb*9/5+32);}
-function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*rh/100;return (svp-avp).toFixed(2);}
-const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
-
-/* ========= State & maps ========= */
+/* ========= State ========= */
 let userLocation={lat:40.7128,lon:-74.0060};
 let maps={};
 let rouletteLayer=null;
@@ -233,13 +319,14 @@ let rouletteLayer=null;
 /* ========= Local panel ========= */
 async function updateLocal(){
   const d=await weather.get(userLocation.lat,userLocation.lon);
+
   document.getElementById('temp').textContent=`${d.temp}°`;
   document.getElementById('dewpoint').textContent=`${d.dewpoint}°`;
   document.getElementById('wetbulb').textContent=`${wetBulb(d.temp,d.humidity)}°`;
   document.getElementById('vpd').textContent=`${vpd(d.temp,d.humidity)}`;
   document.getElementById('spread').textContent=`${d.temp-d.dewpoint}°`;
   document.getElementById('pressure').textContent=`${d.pressure}`;
-  const age=Math.round((Date.now()-d.timestamp)/60000);
+  const age=Math.max(0,Math.round((Date.now()-d.timestamp)/60000));
   document.getElementById('dataAge').textContent=`Data: ${age} min old (${d.source})`;
 
   const spread=d.temp-d.dewpoint;
@@ -254,10 +341,10 @@ async function updateLocal(){
   const risks=surfaces.filter(s=>s.temp<=d.dewpoint).map(s=>s.name);
   document.getElementById('condensationRisk').innerHTML=risks.length?`⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}`:`✓ <strong>No condensation risk</strong> — all surfaces above dew point`;
 
-  // --------- Dew-Point 12h timeline ----------
+  // 12h dew timeline (future hours only)
   const fc=await weather.hourly(userLocation.lat,userLocation.lon);
   const tl=document.getElementById('dewTimeline'); tl.innerHTML='';
-  const now = new Date();
+  const now=new Date();
   const next12 = fc.hours.filter(h => new Date(h.time) > now).slice(0,12);
   (next12.length?next12:fc.hours.slice(0,12)).forEach(h=>{
     const el=document.createElement('div');
@@ -266,19 +353,19 @@ async function updateLocal(){
     tl.appendChild(el);
   });
 
-  // --------- 5-day dew min/max & Fire-Pit evenings (tonight+next 6) ----------
+  // 5-day dew min/max & Fire-Pit evenings (starting tonight)
   const daysEl=document.getElementById('dewDays'); daysEl.innerHTML='';
   const fireEl=document.getElementById('fireDays'); fireEl.innerHTML='';
 
   const midnight=new Date(); midnight.setHours(0,0,0,0);
-  const groups = new Map();
+  const groups=new Map();
   fc.hours.forEach(h=>{
     const t=new Date(h.time);
     if(t>=midnight){ const key=t.toISOString().slice(0,10); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(h); }
   });
   const dayKeys=[...groups.keys()].slice(0,7);
 
-  // 5-day dew min/max
+  // Dew min/max for next 5 days
   dayKeys.slice(0,5).forEach(k=>{
     const arr=groups.get(k);
     const min=Math.min(...arr.map(x=>x.dp));
@@ -289,15 +376,15 @@ async function updateLocal(){
     daysEl.appendChild(el);
   });
 
-  // Fire-pit score for evenings only (6–11 PM)
+  // Fire-pit evenings (6–11 PM), score uses dew point heavily
   dayKeys.forEach(k=>{
-    const arr=groups.get(k).filter(h=>{const hr=new Date(h.time).getHours();return hr>=18&&hr<=23;});
+    const arr=(groups.get(k)||[]).filter(h=>{const hr=new Date(h.time).getHours();return hr>=18&&hr<=23;});
     if(!arr.length) return;
     const avgDew=Math.round(arr.reduce((a,b)=>a+b.dp,0)/arr.length);
     const avgTemp=Math.round(arr.reduce((a,b)=>a+b.temp,0)/arr.length);
     const maxWind=Math.max(...arr.map(h=>h.wind));
     const maxPop=Math.max(...arr.map(h=>h.pop??0));
-    const avgClouds=Math.round(arr.reduce((a,b)=>a+(hSafe(h=>h.clouds,b)??50),0)/arr.length);
+    const avgClouds=Math.round(arr.reduce((a,b)=>a+(Number.isFinite(b.clouds)?b.clouds:50),0)/arr.length);
 
     let score=100;
     if(avgDew<35) score-= (35-avgDew)*2.5;
@@ -337,8 +424,6 @@ async function updateLocal(){
   }else{
     document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
   }
-
-  function hSafe(fn,x){ try{return fn(x);}catch{return null;} }
 }
 
 /* ========= Twins ========= */
@@ -397,14 +482,12 @@ async function roulette(lat, lon){
   const results=document.getElementById('rouletteResults');
   results.innerHTML='<div class="loading" style="margin:20px auto;display:block"></div>';
 
-  // Clear old
   if(rouletteLayer){ rouletteLayer.clearLayers(); }
   else { rouletteLayer=L.layerGroup().addTo(maps.roulette); }
 
   const clicked=await weather.get(lat,lon);
   const clickName=await nameIfUSLand(lat,lon,true) || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
 
-  // Find most different location inside US
   let opposite=null, maxDiff=-1;
   for(let tlat=26;tlat<=48;tlat+=4){
     for(let tlon=-124;tlon<=-67;tlon+=5){
@@ -416,7 +499,6 @@ async function roulette(lat, lon){
   }
   const oppName=await nameIfUSLand(opposite.lat,opposite.lon,true) || `${opposite.lat.toFixed(2)}, ${opposite.lon.toFixed(2)}`;
 
-  // Wildcard within US
   let wild=null, tries=0;
   while(!wild && tries<20){
     const wlat=26+Math.random()*22, wlon=-124+Math.random()*57;
@@ -428,13 +510,11 @@ async function roulette(lat, lon){
     tries++;
   }
 
-  // Map pins (emoji)
   const pin=(emoji)=>L.divIcon({className:'emoji-pin',html:`${emoji}`});
   L.marker([lat,lon],{icon:pin('📍')}).bindPopup(`<strong>${clickName}</strong>`).addTo(rouletteLayer);
   L.marker([opposite.lat,opposite.lon],{icon:pin('🔄')}).bindPopup(`<strong>${oppName}</strong>`).addTo(rouletteLayer);
   if(wild) L.marker([wild.lat,wild.lon],{icon:pin('🎲')}).bindPopup(`<strong>${wild.name}</strong>`).addTo(rouletteLayer);
 
-  // Text results
   results.innerHTML=`
     <h3>📍 Your Click: ${clickName}</h3>
     <div class="twin-card"><div>${clicked.temp}°F / ${clicked.dewpoint}° dew / ${clicked.pressure} hPa</div></div>
@@ -447,7 +527,6 @@ async function roulette(lat, lon){
 
 /* ========= Maps ========= */
 function initMaps(){
-  // Local
   maps.local = L.map('localMap').setView([userLocation.lat, userLocation.lon], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.local);
   const localMarker = L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
@@ -458,11 +537,9 @@ function initMaps(){
     await updateLocal();
   });
 
-  // Twins
   maps.twins = L.map('twinsMap').setView([39,-98],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.twins);
 
-  // Roulette
   maps.roulette = L.map('rouletteMap').setView([39,-98],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.roulette);
   maps.roulette.on('click',(e)=>roulette(e.latlng.lat,e.latlng.lng));
@@ -487,7 +564,7 @@ window.setLocation=async function(){
     maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
     await updateLocal();
   }else{
-    alert('Enter coordinates as: latitude, longitude (e.g., 40.7128, -74.0060)');
+    alert('Enter coordinates as: latitude, longitude (e.g., 33.1148, -79.7853)');
   }
 };
 
@@ -511,7 +588,6 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   initMaps();
   getUserLocation();
   await updateLocal();
-  // refresh hyperlocal every 5 min while on tab
   setInterval(()=>{ if(document.getElementById('local').classList.contains('active')) updateLocal(); }, 5*60*1000);
 });
 </script>
