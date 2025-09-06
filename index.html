@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dummy - Weather's Weird Side</title>
+
+  <!-- Favicon to stop 404 -->
   <link rel="icon" href="dummy_logo.png"/>
 
   <!-- Leaflet -->
@@ -11,7 +13,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    :root{--red:#dc2626;--blue:#3b82f6;--green:#10b981;--amber:#f59e0b;--gray:#f3f4f6;--dark:#0f172a;--muted:#64748b;--card:#ffffff}
+    :root{
+      --red:#dc2626; --blue:#3b82f6; --green:#10b981; --amber:#f59e0b;
+      --gray:#f3f4f6; --dark:#0f172a; --muted:#64748b; --card:#ffffff;
+    }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--gray);color:var(--dark)}
 
@@ -50,14 +55,13 @@
     @keyframes spin{to{transform:rotate(360deg)}}
 
     .timeline{display:flex;gap:.5rem;overflow:auto;padding:.25rem 0 .5rem}
-    .bucket{min-width:96px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:.6rem;text-align:center}
+    .bucket{min-width:86px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:.5rem;text-align:center}
     .bucket strong{display:block;font-size:.9rem}
     .bucket .tval{font-size:1.2rem;font-weight:900;color:var(--red)}
     .bucket .mini{font-size:.7rem;color:#64748b}
 
+    /* Pure-emoji pins, no white disks */
     .emoji-pin{font-size:22px;line-height:22px;text-align:center;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))}
-    .pill-btn{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:.35rem .7rem;font-weight:700;cursor:pointer}
-    .pill-btn:hover{background:#f8fafc}
   </style>
 </head>
 <body>
@@ -70,7 +74,7 @@
   <div class="location-control">
     <span>📍</span>
     <input type="text" id="locationInput" placeholder="Click map or enter coords">
-    <button class="pill-btn" onclick="setLocation()">Set</button>
+    <button onclick="setLocation()">Set</button>
   </div>
 </header>
 
@@ -86,7 +90,7 @@
     <div class="card" style="position:relative">
       <div class="data-age" id="dataAge">Data: -- min old</div>
       <h2>Your Exact Weather</h2>
-      <p style="color:var(--muted);margin-top:.5rem">Click the map to change location</p>
+      <p style="color:var(--muted);margin-top:.5rem">Click anywhere on map to change location</p>
 
       <div class="metrics">
         <div class="metric"><div class="metric-value" id="temp">--°</div><div class="metric-label">Temperature</div></div>
@@ -97,18 +101,18 @@
         <div class="metric"><div class="metric-value" id="pressure">-- hPa</div><div class="metric-label">Pressure</div></div>
       </div>
 
-      <div class="insight" id="moistureInsight">Analyzing moisture dynamics…</div>
-      <div class="insight" id="condensationRisk">Condensation risk assessment…</div>
-      <div class="insight" id="firepitHint">Checking tonight’s fire-pit potential…</div>
+      <div class="insight" id="moistureInsight">Analyzing moisture dynamics...</div>
+      <div class="insight" id="condensationRisk">Condensation risk assessment...</div>
+      <div class="insight" id="firepitHint">Checking tonight's fire-pit potential…</div>
 
       <h3 style="margin-top:.5rem">Dew Point Forecast</h3>
       <p style="color:var(--muted);margin:.25rem 0 .5rem">Next 12 hours</p>
       <div id="dewTimeline" class="timeline"></div>
       <p style="color:var(--muted);margin:.5rem 0 .25rem">Next 5 days (min / max)</p>
       <div id="dewDays" class="timeline"></div>
-
+      
       <h3 style="margin-top:1rem">Fire Pit Forecast</h3>
-      <p style="color:var(--muted);margin:.25rem 0 .5rem">Best evenings this week for outdoor fires (6–11 PM)</p>
+      <p style="color:var(--muted);margin:.25rem 0 .5rem">Best evenings this week for outdoor fires</p>
       <div id="fireDays" class="timeline"></div>
 
       <div id="localMap" class="map"></div>
@@ -119,8 +123,8 @@
   <section id="twins" class="section">
     <div class="card">
       <h2>Weather Twins</h2>
-      <p style="color:var(--muted)">US places experiencing your weather profile right now</p>
-      <div id="twinsList"><p style="text-align:center;color:var(--muted)">Click the tab to search for twins…</p></div>
+      <p style="color:var(--muted)">Places experiencing your weather profile right now</p>
+      <div id="twinsList"><p style="text-align:center;color:var(--muted)">Click the tab to search for twins...</p></div>
       <div id="twinsMap" class="map"></div>
     </div>
   </section>
@@ -129,7 +133,7 @@
   <section id="roulette" class="section">
     <div class="card">
       <h2>Weather Roulette</h2>
-      <p style="color:var(--muted)">Click anywhere on the map for a 3-way comparison (US only)</p>
+      <p style="color:var(--muted)">Click anywhere on the map for a 3-way comparison</p>
       <div id="rouletteMap" class="map"></div>
       <div id="rouletteResults"><p style="text-align:center;color:var(--muted)">Click on the map to spin the weather roulette!</p></div>
     </div>
@@ -137,101 +141,96 @@
 </div>
 
 <script>
-/* ===== helpers: timezone-safe dates & US mask ===== */
-const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
+/* ========= US-only helpers ========= */
 function approxUSLower48(lat, lon){
-  if(lat<25 || lat>49.5 || lon<-125 || lon>-66) return false;
-  if(lat<28.6 && lon>-97 && lon<-80) return false;  // Gulf shelf
-  if(lon>-78 && lat<34.6) return false;             // SE Atlantic shelf
-  if(lat<31.3 && lon>-117 && lon<-98) return false; // N. Mexico fringe
+  if(lat<25 || lat>49.5 || lon<-125 || lon>-66) return false;              // bbox
+  if(lat<28.6 && lon>-97 && lon<-80) return false;                          // Gulf
+  if(lon>-78 && lat<34.6) return false;                                     // Atlantic shelf
+  if(lat<31.3 && lon>-117 && lon<-98) return false;                         // N. Mexico band
   return true;
 }
 
-/* ===== throttled reverse geocode (US only) ===== */
-const geocodeCache=new Map();let geocodeQueue=Promise.resolve();
-async function nameIfUSLand(lat, lon, withState=false){
+const geocodeCache=new Map();
+let geocodeQueue = Promise.resolve();
+
+async function nameIfUSLand(lat, lon, includeState=false){
   if(!approxUSLower48(lat,lon)) return null;
-  const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${withState}`;
+  const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${includeState}`;
   if(geocodeCache.has(key)) return geocodeCache.get(key);
-  return geocodeQueue = geocodeQueue.then(async()=>{
-    await new Promise(r=>setTimeout(r,120));
+  return geocodeQueue = geocodeQueue.then(async () => {
+    await new Promise(r=>setTimeout(r,110));
     try{
       const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1&accept-language=en&countrycodes=us`;
-      const r=await fetch(url); if(!r.ok){ geocodeCache.set(key,null); return null; }
-      const j=await r.json(); const a=j.address||{};
-      const water=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];
-      if(water.some(w=>j.display_name?.includes(w))){ geocodeCache.set(key,null); return null; }
+      const r=await fetch(url,{headers:{'Accept':'application/json'}});
+      if(!r.ok){ geocodeCache.set(key,null); return null; }
+      const j=await r.json();
+      const a=j.address||{};
+      const waterWords=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];
+      if(waterWords.some(w=>j.display_name?.includes(w))) { geocodeCache.set(key,null); return null; }
       let label=(a.city||a.town||a.village||a.hamlet||a.county||'').toString();
-      if(!label && a.state) label=a.state; if(!label){ geocodeCache.set(key,null); return null; }
-      if(withState && a.state) label=`${label}, ${a.state}`;
-      geocodeCache.set(key,label); return label;
+      if(!label && a.state) label=a.state;
+      if(!label) { geocodeCache.set(key,null); return null; }
+      if(includeState && a.state) label = `${label}, ${a.state}`;
+      geocodeCache.set(key,label);
+      return label;
     }catch{ geocodeCache.set(key,null); return null; }
   });
 }
 
-/* ===== weather service (with timezone-aware day filtering) ===== */
+/* ========= Weather service ========= */
 class Weather{
-  constructor(){this.cache=new Map();this.CACHE=5*60*1000;}
+  constructor(){ this.cache=new Map(); this.CACHE=5*60*1000; }
   async get(lat,lon){
-    const key=`${lat.toFixed(2)},${lon.toFixed(2)}`;const c=this.cache.get(key);
+    const key=`${lat.toFixed(2)},${lon.toFixed(2)}`;
+    const c=this.cache.get(key);
     if(c && Date.now()-c.t<this.CACHE) return c.d;
     try{
       const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
       const r=await fetch(url);
       if(r.ok){
         const d=await r.json();
-        const out={temp:Math.round(d.current.temperature_2m),dewpoint:Math.round(d.current.dew_point_2m),humidity:d.current.relative_humidity_2m,pressure:Math.round(d.current.surface_pressure),wind:Math.round(d.current.wind_speed_10m),timestamp:new Date(),source:'Open-Meteo'};
-        this.cache.set(key,{d:out,t:Date.now()});return out;
+        const out={
+          temp:Math.round(d.current.temperature_2m),
+          dewpoint:Math.round(d.current.dew_point_2m),
+          humidity:d.current.relative_humidity_2m,
+          pressure:Math.round(d.current.surface_pressure),
+          wind:Math.round(d.current.wind_speed_10m),
+          timestamp:new Date(),
+          source:'Open-Meteo'
+        };
+        this.cache.set(key,{d:out,t:Date.now()});
+        return out;
       }
-    }catch(e){console.error(e)}
+    }catch(e){ console.error(e); }
     return {temp:72,dewpoint:55,humidity:50,pressure:1013,wind:5,timestamp:new Date(),source:'Fallback'};
   }
   async hourly(lat,lon){
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=dew_point_2m,temperature_2m,wind_speed_10m,precipitation_probability,cloud_cover&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
     const r=await fetch(url); const j=await r.json();
-    const tz=j.timezone||'UTC';
-
-    // Build hours (keep the original ISO string and parse numbers, but don't change its date)
     const hours=(j.hourly.time||[]).map((t,i)=>({
       time:t,
-      dateStr:t.slice(0,10),                         // YYYY-MM-DD in *location* timezone
       dp:Math.round(j.hourly.dew_point_2m?.[i]??NaN),
       temp:Math.round(j.hourly.temperature_2m?.[i]??NaN),
       wind:Math.round(j.hourly.wind_speed_10m?.[i]??0),
       pop:j.hourly.precipitation_probability?.[i]??null,
       clouds:j.hourly.cloud_cover?.[i]??null
     }));
-
-    // Today's date in the *location* timezone
-    const todayLocal = new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); // YYYY-MM-DD
-
-    // Group by location-local date, skipping anything before todayLocal
-    const byDay=new Map();
-    hours.forEach(h=>{ if(h.dateStr<todayLocal) return; if(!byDay.has(h.dateStr)) byDay.set(h.dateStr,[]); byDay.get(h.dateStr).push(h); });
-
-    const days=[...byDay.entries()].slice(0,7).map(([date,hs])=>({
-      date, tz,
-      dow:new Date(date+'T00:00').toLocaleDateString('en-US',{weekday:'short'}),
-      min:Math.min(...hs.map(h=>h.dp).filter(v=>!isNaN(v))),
-      max:Math.max(...hs.map(h=>h.dp).filter(v=>!isNaN(v))),
-      hours:hs
-    }));
-
-    return {hours,days,todayLocal,tz};
+    return {hours};
   }
 }
 const weather=new Weather();
 
-/* ===== calcs ===== */
+/* ========= Calcs ========= */
 function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.sqrt(rh+8.313659))+Math.atan(C+rh)-Math.atan(rh-1.676331)+0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)-4.686035;return Math.round(wb*9/5+32);}
 function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*rh/100;return (svp-avp).toFixed(2);}
-const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
 
-/* ===== state ===== */
+/* ========= State & maps ========= */
 let userLocation={lat:40.7128,lon:-74.0060};
 let maps={};
+let rouletteLayer=null;
 
-/* ===== Your Weather panel ===== */
+/* ========= Local panel ========= */
 async function updateLocal(){
   const d=await weather.get(userLocation.lat,userLocation.lon);
   document.getElementById('temp').textContent=`${d.temp}°`;
@@ -255,78 +254,94 @@ async function updateLocal(){
   const risks=surfaces.filter(s=>s.temp<=d.dewpoint).map(s=>s.name);
   document.getElementById('condensationRisk').innerHTML=risks.length?`⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}`:`✓ <strong>No condensation risk</strong> — all surfaces above dew point`;
 
+  // --------- Dew-Point 12h timeline ----------
   const fc=await weather.hourly(userLocation.lat,userLocation.lon);
-
-  // 12h dew timeline starting at the next hour IN LOCATION TZ
-  const tzHour = parseInt(new Intl.DateTimeFormat('en-US',{timeZone:fc.tz,hour:'2-digit',hour12:false}).format(new Date()),10);
-  const idx = fc.hours.findIndex(h => h.dateStr===fc.todayLocal && parseInt(h.time.slice(11,13),10) >= tzHour+1);
-  const next12 = (idx>=0 ? fc.hours.slice(idx, idx+12)
-                         : fc.hours.filter(h => (h.dateStr>fc.todayLocal)).slice(0,12));
   const tl=document.getElementById('dewTimeline'); tl.innerHTML='';
-  next12.forEach(h=>{
-    const el=document.createElement('div');el.className='bucket';
+  const now = new Date();
+  const next12 = fc.hours.filter(h => new Date(h.time) > now).slice(0,12);
+  (next12.length?next12:fc.hours.slice(0,12)).forEach(h=>{
+    const el=document.createElement('div');
+    el.className='bucket';
     el.innerHTML=`<strong>${fmtTime(h.time)}</strong><div class="tval">${h.dp}°</div><div class="mini">${(h.pop??'–')}% precip • ${h.wind} mph</div>`;
     tl.appendChild(el);
   });
 
-  // Next 5 days from todayLocal
-  const days=document.getElementById('dewDays'); days.innerHTML='';
-  fc.days.slice(0,5).forEach(dy=>{
-    const el=document.createElement('div');el.className='bucket';
-    el.innerHTML=`<strong>${dy.dow}</strong><div class="tval">${dy.min}° – ${dy.max}°</div><div class="mini">min / max dew</div>`;
-    days.appendChild(el);
+  // --------- 5-day dew min/max & Fire-Pit evenings (tonight+next 6) ----------
+  const daysEl=document.getElementById('dewDays'); daysEl.innerHTML='';
+  const fireEl=document.getElementById('fireDays'); fireEl.innerHTML='';
+
+  const midnight=new Date(); midnight.setHours(0,0,0,0);
+  const groups = new Map();
+  fc.hours.forEach(h=>{
+    const t=new Date(h.time);
+    if(t>=midnight){ const key=t.toISOString().slice(0,10); if(!groups.has(key)) groups.set(key,[]); groups.get(key).push(h); }
+  });
+  const dayKeys=[...groups.keys()].slice(0,7);
+
+  // 5-day dew min/max
+  dayKeys.slice(0,5).forEach(k=>{
+    const arr=groups.get(k);
+    const min=Math.min(...arr.map(x=>x.dp));
+    const max=Math.max(...arr.map(x=>x.dp));
+    const el=document.createElement('div');
+    el.className='bucket';
+    el.innerHTML=`<strong>${new Date(k).toLocaleDateString('en-US',{weekday:'short'})}</strong><div class="tval">${min}° – ${max}°</div><div class="mini">min / max dew</div>`;
+    daysEl.appendChild(el);
   });
 
-  // Evening fire-pit scoring (6–11 PM, location timezone). Dew point weighted 40–55 sweet spot.
-  const firePitDays=document.getElementById('fireDays'); firePitDays.innerHTML='';
-  fc.days.slice(0,7).forEach(day=>{
-    const evening=day.hours.filter(h=>{const hr=parseInt(h.time.slice(11,13),10);return hr>=18&&hr<=23;});
-    if(!evening.length) return;
-    const avg=(arr,sel)=>Math.round(arr.reduce((a,b)=>a+sel(b),0)/arr.length);
-    const avgDew=avg(evening,h=>h.dp);
-    const avgTemp=avg(evening,h=>h.temp);
-    const maxWind=Math.max(...evening.map(h=>h.wind));
-    const maxPop=Math.max(...evening.map(h=>h.pop??0));
-    const avgClouds=avg(evening,h=>h.clouds??50);
+  // Fire-pit score for evenings only (6–11 PM)
+  dayKeys.forEach(k=>{
+    const arr=groups.get(k).filter(h=>{const hr=new Date(h.time).getHours();return hr>=18&&hr<=23;});
+    if(!arr.length) return;
+    const avgDew=Math.round(arr.reduce((a,b)=>a+b.dp,0)/arr.length);
+    const avgTemp=Math.round(arr.reduce((a,b)=>a+b.temp,0)/arr.length);
+    const maxWind=Math.max(...arr.map(h=>h.wind));
+    const maxPop=Math.max(...arr.map(h=>h.pop??0));
+    const avgClouds=Math.round(arr.reduce((a,b)=>a+(hSafe(h=>h.clouds,b)??50),0)/arr.length);
 
     let score=100;
-    if(avgDew<40) score-= (40-avgDew)*2.5;
+    if(avgDew<35) score-= (35-avgDew)*2.5;
     if(avgDew>55) score-= (avgDew-55)*2.5;
     if(maxWind>10) score-= (maxWind-10)*3;
     if(maxWind>20) score=0;
-    score-= maxPop*0.9;
+    score -= maxPop*0.8;
     if(avgClouds>30) score-= (avgClouds-30)*0.5;
     if(avgTemp<55) score-= (55-avgTemp);
     if(avgTemp>75) score-= (avgTemp-75)*0.5;
-    score=clamp(Math.round(score),0,100);
+    score=Math.max(0,Math.min(100,score));
 
-    let rating='❌',color='#dc2626';
-    if(score>=80){rating='🔥🔥🔥';color='#10b981'}
-    else if(score>=60){rating='🔥🔥';color='#f59e0b'}
-    else if(score>=40){rating='🔥';color:'#64748b'}
+    let rating='',color='';
+    if(score>=80){rating='🔥🔥🔥';color='#10b981';}
+    else if(score>=60){rating='🔥🔥';color='#f59e0b';}
+    else if(score>=40){rating='🔥';color='#64748b';}
+    else {rating='❌';color='#dc2626';}
 
-    const el=document.createElement('div');el.className='bucket';el.style.minWidth='110px';
-    el.innerHTML=`<strong>${day.dow}</strong>
+    const el=document.createElement('div');
+    el.className='bucket';
+    el.style.minWidth='100px';
+    el.innerHTML=`<strong>${new Date(k).toLocaleDateString('en-US',{weekday:'short'})}</strong>
       <div style="font-size:1.5rem">${rating}</div>
-      <div class="mini" style="color:${color}">${score}% ideal</div>
-      <div class="mini" style="font-size:.62rem">${avgTemp}°F • ${maxWind}mph<br>${maxPop}% rain • ${avgClouds}% clouds</div>`;
-    firePitDays.appendChild(el);
+      <div class="mini" style="color:${color}">${Math.round(score)}% ideal</div>
+      <div class="mini" style="font-size:.6rem">${avgTemp}°F • ${maxWind}mph<br>${maxPop}% rain • ${avgClouds}% clouds</div>`;
+    fireEl.appendChild(el);
   });
 
-  // Tonight hint using location-local date
-  const tonight=fc.hours.filter(h=>h.dateStr===fc.todayLocal && parseInt(h.time.slice(11,13),10)>=18 && parseInt(h.time.slice(11,13),10)<=23);
+  // Tonight quick hint
+  const tonight = groups.get(dayKeys[0])?.filter(h=>{const hr=new Date(h.time).getHours();return hr>=18&&hr<=23;})||[];
   if(tonight.length){
-    const avgDew=Math.round(tonight.reduce((a,b)=>a+b.dp,0)/tonight.length);
+    const avgDP=Math.round(tonight.reduce((a,b)=>a+b.dp,0)/tonight.length);
     const maxWind=Math.max(...tonight.map(h=>h.wind));
     const maxPop=Math.max(...tonight.map(h=>h.pop??0));
-    const good=(avgDew>=40&&avgDew<=55)&&maxWind<=12&&maxPop<25;
-    document.getElementById('firepitHint').innerHTML=good?`🔥 <strong>Good fire-pit tonight:</strong> avg dew ${avgDew}°, wind ≤${maxWind} mph, precip ≤${maxPop}%`:`🪵 <strong>Meh for fire-pit:</strong> avg dew ${avgDew}°, wind up to ${maxWind} mph, precip up to ${maxPop}%`;
+    const good=(avgDP>=35&&avgDP<=55)&&maxWind<=12&&maxPop<25;
+    document.getElementById('firepitHint').innerHTML=good?`🔥 <strong>Good fire-pit tonight:</strong> avg dew ${avgDP}°, wind ≤${maxWind} mph, precip ≤${maxPop}%`:`🪵 <strong>Meh for fire-pit:</strong> avg dew ${avgDP}°, wind up to ${maxWind} mph, precip up to ${maxPop}%`;
   }else{
     document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
   }
+
+  function hSafe(fn,x){ try{return fn(x);}catch{return null;} }
 }
 
-/* ===== Twins ===== */
+/* ========= Twins ========= */
 async function findTwins(){
   const me=await weather.get(userLocation.lat,userLocation.lon);
   const list=document.getElementById('twinsList');
@@ -337,20 +352,24 @@ async function findTwins(){
   }
 
   const grid=[];
-  for(let lat=26;lat<=48;lat+=3){ for(let lon=-124;lon<=-67;lon+=4){ if(approxUSLower48(lat,lon)) grid.push({lat,lon}); } }
+  for(let lat=26;lat<=48;lat+=3){
+    for(let lon=-124;lon<=-67;lon+=4){
+      if(approxUSLower48(lat,lon)) grid.push({lat,lon});
+    }
+  }
 
-  const candidates=[];
+  const raw=[];
   for(const p of grid){
     const w=await weather.get(p.lat,p.lon);
     const sim=Math.abs(w.temp-me.temp)+Math.abs(w.dewpoint-me.dewpoint)+Math.abs(w.pressure-me.pressure)/10;
-    if(sim<10) candidates.push({lat:p.lat,lon:p.lon,weather:w,similarity:sim});
+    if(sim<10) raw.push({lat:p.lat,lon:p.lon,weather:w,similarity:sim});
   }
-  candidates.sort((a,b)=>a.similarity-b.similarity);
+  raw.sort((a,b)=>a.similarity-b.similarity);
 
   const named=[];
-  for(const c of candidates){
-    const nm=await nameIfUSLand(c.lat,c.lon,true);
-    if(nm){ named.push({...c,name:nm}); if(named.length>=12) break; }
+  for(const r of raw){
+    const nm=await nameIfUSLand(r.lat,r.lon,true);
+    if(nm){ named.push({...r,name:nm}); if(named.length>=12) break; }
   }
 
   if(!named.length){ list.innerHTML='<p style="text-align:center;color:var(--muted)">No close US land twins found.</p>'; return; }
@@ -366,105 +385,134 @@ async function findTwins(){
     L.marker([userLocation.lat,userLocation.lon]).bindPopup(`You: <strong>${youName}</strong>`).addTo(maps.twins);
     named.forEach(t=>{
       L.circleMarker([t.lat,t.lon],{radius:8,color:'#10b981',fillOpacity:.6})
-        .bindPopup(`<strong>${t.name}</strong><br>${t.weather.temp}°F / ${t.weather.dewpoint}° dew`)
-        .addTo(maps.twins);
+       .bindPopup(`<strong>${t.name}</strong><br>${t.weather.temp}°F • Dew ${t.weather.dewpoint}°`)
+       .addTo(maps.twins);
     });
     setTimeout(()=>maps.twins.invalidateSize(),0);
   }
 }
 
-/* ===== Roulette (US only + emoji markers) ===== */
-function divEmoji(emoji){return L.divIcon({className:'emoji-pin',html:emoji,iconSize:[22,22],iconAnchor:[11,11]});}
-async function roulette(lat,lon){
-  if(!approxUSLower48(lat,lon)) return;
-  const clicked=await weather.get(lat,lon);
+/* ========= Weather Roulette ========= */
+async function roulette(lat, lon){
+  const results=document.getElementById('rouletteResults');
+  results.innerHTML='<div class="loading" style="margin:20px auto;display:block"></div>';
 
-  let opp=null,maxDiff=-1;
-  for(let la=26;la<=48;la+=5){
-    for(let lo=-124;lo<=-67;lo+=6){
-      if(!approxUSLower48(la,lo))continue;
-      const w=await weather.get(la,lo);
+  // Clear old
+  if(rouletteLayer){ rouletteLayer.clearLayers(); }
+  else { rouletteLayer=L.layerGroup().addTo(maps.roulette); }
+
+  const clicked=await weather.get(lat,lon);
+  const clickName=await nameIfUSLand(lat,lon,true) || `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+
+  // Find most different location inside US
+  let opposite=null, maxDiff=-1;
+  for(let tlat=26;tlat<=48;tlat+=4){
+    for(let tlon=-124;tlon<=-67;tlon+=5){
+      if(!approxUSLower48(tlat,tlon)) continue;
+      const w=await weather.get(tlat,tlon);
       const diff=Math.abs(w.temp-clicked.temp)+Math.abs(w.dewpoint-clicked.dewpoint);
-      if(diff>maxDiff){maxDiff=diff;opp={lat:la,lon:lo,weather:w};}
+      if(diff>maxDiff){maxDiff=diff;opposite={lat:tlat,lon:tlon,weather:w};}
     }
   }
-  let wlat,wlon; do{wlat=26+Math.random()*22; wlon=-124+Math.random()*57;}while(!approxUSLower48(wlat,wlon));
-  const wild=await weather.get(wlat,wlon);
+  const oppName=await nameIfUSLand(opposite.lat,opposite.lon,true) || `${opposite.lat.toFixed(2)}, ${opposite.lon.toFixed(2)}`;
 
-  const clickName=await nameIfUSLand(lat,lon,true)||`${lat.toFixed(2)}, ${Math.abs(lon).toFixed(2)}°W`;
-  const oppName=await nameIfUSLand(opp.lat,opp.lon,true)||`${opp.lat.toFixed(2)}, ${Math.abs(opp.lon).toFixed(2)}°W`;
-  const wildName=await nameIfUSLand(wlat,wlon,true)||`${wlat.toFixed(2)}, ${Math.abs(wlon).toFixed(2)}°W`;
-
-  if(maps.roulette){
-    maps.roulette.eachLayer(l=>{ if(l._emoji) maps.roulette.removeLayer(l); });
-    const a=L.marker([lat,lon],{icon:divEmoji('📍')}).addTo(maps.roulette); a._emoji=true;
-    const b=L.marker([opp.lat,opp.lon],{icon:divEmoji('🔄')}).addTo(maps.roulette); b._emoji=true;
-    const c=L.marker([wlat,wlon],{icon:divEmoji('🎲')}).addTo(maps.roulette); c._emoji=true;
+  // Wildcard within US
+  let wild=null, tries=0;
+  while(!wild && tries<20){
+    const wlat=26+Math.random()*22, wlon=-124+Math.random()*57;
+    if(approxUSLower48(wlat,wlon)){
+      const w=await weather.get(wlat,wlon);
+      const name=await nameIfUSLand(wlat,wlon,true);
+      if(name) wild={lat:wlat,lon:wlon,weather:w,name};
+    }
+    tries++;
   }
 
-  document.getElementById('rouletteResults').innerHTML=`
+  // Map pins (emoji)
+  const pin=(emoji)=>L.divIcon({className:'emoji-pin',html:`${emoji}`});
+  L.marker([lat,lon],{icon:pin('📍')}).bindPopup(`<strong>${clickName}</strong>`).addTo(rouletteLayer);
+  L.marker([opposite.lat,opposite.lon],{icon:pin('🔄')}).bindPopup(`<strong>${oppName}</strong>`).addTo(rouletteLayer);
+  if(wild) L.marker([wild.lat,wild.lon],{icon:pin('🎲')}).bindPopup(`<strong>${wild.name}</strong>`).addTo(rouletteLayer);
+
+  // Text results
+  results.innerHTML=`
     <h3>📍 Your Click: ${clickName}</h3>
     <div class="twin-card"><div>${clicked.temp}°F / ${clicked.dewpoint}° dew / ${clicked.pressure} hPa</div></div>
     <h3>🔄 Weather Opposite: ${oppName}</h3>
-    <div class="twin-card"><div>${opp.weather.temp}°F / ${opp.weather.dewpoint}° dew / ${opp.weather.pressure} hPa</div><div style="color:var(--amber);font-weight:bold">${maxDiff}° different!</div></div>
-    <h3>🎲 Wildcard: ${wildName}</h3>
-    <div class="twin-card"><div>${wild.temp}°F / ${wild.dewpoint}° dew / ${wild.pressure} HPa</div></div>
+    <div class="twin-card"><div>${opposite.weather.temp}°F / ${opposite.weather.dewpoint}° dew / ${opposite.weather.pressure} hPa</div>
+      <div style="color:var(--amber);font-weight:bold">${maxDiff}° different!</div></div>
+    ${wild?`<h3>🎲 Wildcard: ${wild.name}</h3><div class="twin-card"><div>${wild.weather.temp}°F / ${wild.weather.dewpoint}° dew / ${wild.weather.pressure} hPa</div></div>`:''}
   `;
 }
 
-/* ===== maps, tabs, location ===== */
+/* ========= Maps ========= */
 function initMaps(){
-  maps.local=L.map('localMap').setView([userLocation.lat,userLocation.lon],9);
+  // Local
+  maps.local = L.map('localMap').setView([userLocation.lat, userLocation.lon], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.local);
-  const localMarker=L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
-  maps.local.on('click',async e=>{userLocation={lat:e.latlng.lat,lon:e.latlng.lng};localMarker.setLatLng(e.latlng);document.getElementById('locationInput').value=`${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;await updateLocal();});
+  const localMarker = L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
+  maps.local.on('click', async (e)=>{
+    userLocation={lat:e.latlng.lat,lon:e.latlng.lng};
+    localMarker.setLatLng(e.latlng);
+    document.getElementById('locationInput').value=`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    await updateLocal();
+  });
 
-  maps.twins=L.map('twinsMap').setView([39,-98],4);
+  // Twins
+  maps.twins = L.map('twinsMap').setView([39,-98],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.twins);
 
-  maps.roulette=L.map('rouletteMap').setView([39,-98],4);
+  // Roulette
+  maps.roulette = L.map('rouletteMap').setView([39,-98],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.roulette);
-  maps.roulette.on('click',e=>roulette(e.latlng.lat,e.latlng.lng));
+  maps.roulette.on('click',(e)=>roulette(e.latlng.lat,e.latlng.lng));
 }
+
+/* ========= Tabs, location, init ========= */
 window.switchTab=function(evt,tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   evt.target.classList.add('active');
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
-  setTimeout(()=>{ if(maps[tab]) maps[tab].invalidateSize(); },100);
+  setTimeout(()=>{ if(maps[tab]) maps[tab].invalidateSize(); }, 80);
   if(tab==='twins') findTwins();
 };
+
 window.setLocation=async function(){
   const input=document.getElementById('locationInput').value.trim();
   const parts=input.split(',').map(s=>parseFloat(s));
   if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){
     userLocation={lat:parts[0],lon:parts[1]};
-    if(maps.local){
-      maps.local.setView([userLocation.lat,userLocation.lon],9);
-      maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
-    }
+    maps.local.setView([userLocation.lat,userLocation.lon],8);
+    maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
     await updateLocal();
-  }else{ alert('Enter: latitude, longitude (e.g., 40.7128, -74.0060)'); }
+  }else{
+    alert('Enter coordinates as: latitude, longitude (e.g., 40.7128, -74.0060)');
+  }
 };
+
 function getUserLocation(){
   if(navigator.geolocation){
     navigator.geolocation.getCurrentPosition(async pos=>{
       userLocation={lat:pos.coords.latitude,lon:pos.coords.longitude};
       document.getElementById('locationInput').value=`${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
-      if(maps.local){
-        maps.local.setView([userLocation.lat,userLocation.lon],9);
-        maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
-      }
+      maps.local.setView([userLocation.lat,userLocation.lon],8);
+      maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
       await updateLocal();
-    },err=>console.log('Geolocation error:',err));
+    }, async ()=>{
+      await updateLocal(); // fallback uses default NYC
+    });
+  }else{
+    updateLocal();
   }
 }
 
-/* ===== boot ===== */
 window.addEventListener('DOMContentLoaded', async ()=>{
   initMaps();
   getUserLocation();
-  updateLocal(); // default render
+  await updateLocal();
+  // refresh hyperlocal every 5 min while on tab
+  setInterval(()=>{ if(document.getElementById('local').classList.contains('active')) updateLocal(); }, 5*60*1000);
 });
 </script>
 </body>
