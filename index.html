@@ -42,7 +42,10 @@
     .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin:1.5rem 0}
     .metric{text-align:center;padding:1rem;background:var(--gray);border-radius:.75rem}
     .metric-value{font-size:2rem;font-weight:900;color:var(--red)}
-    .metric-label{font-size:.75rem;text-transform:uppercase;color:var(--muted);margin-top:.25rem}
+    .metric-label{font-size:.75rem;text-transform:uppercase;color:var(--muted);margin-top:.25rem;display:flex;gap:.35rem;justify-content:center;align-items:center}
+
+    .help{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e5e7eb;color:#334155;font-weight:900;font-size:.7rem;cursor:help;line-height:18px}
+    .help:hover{background:#e2e8f0}
 
     .map{height:500px;border-radius:1rem;overflow:hidden;margin:1rem 0}
 
@@ -93,12 +96,45 @@
       <p style="color:var(--muted);margin-top:.5rem">Click anywhere on map to change location</p>
 
       <div class="metrics">
-        <div class="metric"><div class="metric-value" id="temp">--°</div><div class="metric-label">Temperature</div></div>
-        <div class="metric"><div class="metric-value" id="wetbulb">--°</div><div class="metric-label">Wet Bulb</div></div>
-        <div class="metric"><div class="metric-value" id="dewpoint">--°</div><div class="metric-label">Dew Point</div></div>
-        <div class="metric"><div class="metric-value" id="vpd">-- kPa</div><div class="metric-label">VPD</div></div>
-        <div class="metric"><div class="metric-value" id="spread">--°</div><div class="metric-label">T–Td Spread</div></div>
-        <div class="metric"><div class="metric-value" id="pressure">-- hPa</div><div class="metric-label">Pressure</div></div>
+        <div class="metric">
+          <div class="metric-value" id="temp">--°</div>
+          <div class="metric-label">Temperature</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="wetbulb">--°</div>
+          <div class="metric-label">
+            Wet Bulb
+            <span class="help" title="Approx air temp felt by a wet surface as water evaporates. Great proxy for heat stress.">?</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="dewpoint">--°</div>
+          <div class="metric-label">
+            Dew Point
+            <span class="help" title="Moisture in the air: ~55°F feels dry, 60–65° a bit humid, 70°+ tropical.">?</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="vpd">-- kPa</div>
+          <div class="metric-label">
+            VPD
+            <span class="help" title="Vapor Pressure Deficit: how ‘thirsty’ the air is. 0–0.5: saturated • 0.5–2: comfy • >2: very dry.">?</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="spread">--°</div>
+          <div class="metric-label">
+            T–Td Spread
+            <span class="help" title="Gap between temp and dew point. Small gap = muggy & higher condensation risk.">?</span>
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="pressure">-- hPa</div>
+          <div class="metric-label">
+            Pressure
+            <span class="help" title="Sea-level pressure. ~1013 hPa is average. Higher: calm/clear. Lower: unsettled/stormy.">?</span>
+          </div>
+        </div>
       </div>
 
       <div class="insight" id="moistureInsight">Analyzing moisture dynamics...</div>
@@ -275,7 +311,7 @@ class Weather{
       ? Math.round(j.current.dew_point_2m)
       : null;
 
-    return {hours, omCurrentDp};
+    return {hours, omCurrentDp, tz: j.timezone || 'UTC'};
   }
 }
 const weather=new Weather();
@@ -285,10 +321,8 @@ function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.s
 function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*rh/100;return (svp-avp).toFixed(2);}
 const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-function localDateKey(dt){
-  const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,'0'), d=String(dt.getDate()).padStart(2,'0');
-  return `${y}-${m}-${d}`;
-}
+const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz}); // YYYY-MM-DD
+const todayKeyInTz=(tz)=> new Date().toLocaleDateString('en-CA',{timeZone:tz});
 
 /* ========= State & maps ========= */
 let userLocation={lat:40.7128,lon:-74.0060};
@@ -337,8 +371,8 @@ async function updateLocal(){
 
   // 3) Next 12h dew (future only)
   const tl=document.getElementById('dewTimeline'); tl.innerHTML='';
-  const now=new Date();
-  const next12 = correctedHours.filter(h => new Date(h.time) > now).slice(0,12);
+  const nowAbs=new Date();
+  const next12 = correctedHours.filter(h => new Date(h.time) > nowAbs).slice(0,12);
   (next12.length?next12:correctedHours.slice(0,12)).forEach(h=>{
     const el=document.createElement('div');
     el.className='bucket';
@@ -348,18 +382,18 @@ async function updateLocal(){
     tl.appendChild(el);
   });
 
-  // 4) Group by LOCAL day starting today
-  const startToday=new Date(); startToday.setHours(0,0,0,0);
+  // 4) Group by FORECAST LOCATION time zone (start today)
+  const tz = fc.tz || 'UTC';
+  const todayKey = todayKeyInTz(tz);
   const groups=new Map();
   correctedHours.forEach(h=>{
-    const t=new Date(h.time);
-    if(t>=startToday){
-      const key=localDateKey(t);
+    const key=dateKeyInTz(h.time, tz);
+    if(key>=todayKey){
       if(!groups.has(key)) groups.set(key,[]);
       groups.get(key).push(h);
     }
   });
-  const dayKeys=[...groups.keys()].slice(0,7);
+  const dayKeys=[...groups.keys()].sort(); // ensure order
 
   // 5) 5-day min/max dew (corrected)
   const daysEl=document.getElementById('dewDays'); daysEl.innerHTML='';
@@ -369,7 +403,7 @@ async function updateLocal(){
     const max=Math.max(...arr.map(x=>x.dp));
     const el=document.createElement('div');
     el.className='bucket';
-    el.innerHTML=`<strong>${new Date(k).toLocaleDateString('en-US',{weekday:'short'})}</strong>`+
+    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short', timeZone: tz})}</strong>`+
                  `<div class="tval">${min}° – ${max}°</div>`+
                  `<div class="mini">min / max dew</div>`;
     daysEl.appendChild(el);
@@ -379,8 +413,9 @@ async function updateLocal(){
   const fireEl=document.getElementById('fireDays'); fireEl.innerHTML='';
   dayKeys.forEach(k=>{
     const arr=(groups.get(k)||[]).filter(h=>{
-      const hr=new Date(h.time).getHours();
-      return hr>=18 && hr<=23;
+      const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz});
+      const hInt=parseInt(hr,10);
+      return hInt>=18 && hInt<=23;
     });
     if(!arr.length) return;
 
@@ -410,31 +445,34 @@ async function updateLocal(){
     const el=document.createElement('div');
     el.className='bucket';
     el.style.minWidth='100px';
-    el.innerHTML=`<strong>${new Date(k).toLocaleDateString('en-US',{weekday:'short'})}</strong>
+    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short', timeZone: tz})}</strong>
       <div style="font-size:1.5rem">${rating}</div>
       <div class="mini" style="color:${color}">${Math.round(score)}% ideal</div>
       <div class="mini" style="font-size:.6rem">${avgTemp}°F • ${maxWind}mph<br>${maxPop}% rain • ${avgClouds}% clouds</div>`;
     fireEl.appendChild(el);
   });
 
-  // 7) Tonight quick hint
-  const tonight = (groups.get(dayKeys[0])||[]).filter(h=>{
-    const hr=new Date(h.time).getHours();
-    return hr>=18 && hr<=23;
-  });
-  if(tonight.length){
-    const avgDP=Math.round(tonight.reduce((a,b)=>a+b.dp,0)/tonnight.length);
-  } else {
+  // 7) Tonight quick hint (using location tz)
+  const tonightKey = dayKeys[0];
+  if(tonightKey){
+    const tonightArr=(groups.get(tonightKey)||[]).filter(h=>{
+      const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz});
+      const hInt=parseInt(hr,10);
+      return hInt>=18 && hInt<=23;
+    });
+    if(tonightArr.length){
+      const avgDP=Math.round(tonightArr.reduce((a,b)=>a+b.dp,0)/tonightArr.length);
+      const maxWind=Math.max(...tonightArr.map(h=>h.wind));
+      const maxPop=Math.max(...tonightArr.map(h=>h.pop??0));
+      const good=(avgDP>=35&&avgDP<=55)&&maxWind<=12&&maxPop<25;
+      document.getElementById('firepitHint').innerHTML=good
+        ? `🔥 <strong>Good fire-pit tonight:</strong> avg dew ${avgDP}°, wind ≤${maxWind} mph, precip ≤${maxPop}%`
+        : `🪵 <strong>Meh for fire-pit:</strong> avg dew ${avgDP}°, wind up to ${maxWind} mph, precip up to ${maxPop}%`;
+    }else{
+      document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
+    }
+  }else{
     document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
-  }
-  if(tonight.length){
-    const avgDP=Math.round(tonight.reduce((a,b)=>a+b.dp,0)/tonight.length);
-    const maxWind=Math.max(...tonight.map(h=>h.wind));
-    const maxPop=Math.max(...tonight.map(h=>h.pop??0));
-    const good=(avgDP>=35&&avgDP<=55)&&maxWind<=12&&maxPop<25;
-    document.getElementById('firepitHint').innerHTML=good
-      ? `🔥 <strong>Good fire-pit tonight:</strong> avg dew ${avgDP}°, wind ≤${maxWind} mph, precip ≤${maxPop}%`
-      : `🪵 <strong>Meh for fire-pit:</strong> avg dew ${avgDP}°, wind up to ${maxWind} mph, precip up to ${maxPop}%`;
   }
 }
 
