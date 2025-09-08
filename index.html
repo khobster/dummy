@@ -45,7 +45,7 @@
     .metric-value{font-size:2rem;font-weight:900;color:var(--red)}
     .metric-label{font-size:.75rem;text-transform:uppercase;color:var(--muted);margin-top:.25rem;display:flex;gap:.35rem;justify-content:center;align-items:center}
 
-    /* custom tooltips (hover + focus, desktop & keyboard friendly) */
+    /* custom tooltips */
     .help{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e5e7eb;color:#334155;font-weight:900;font-size:.7rem;cursor:help;line-height:18px;position:relative}
     .help:hover{background:#e2e8f0}
     .help:focus{outline:2px solid #cbd5e1}
@@ -53,8 +53,7 @@
       content:attr(data-tip);
       position:absolute; bottom:130%; left:50%; transform:translateX(-50%) translateY(4px);
       background:var(--tooltip); color:#fff; padding:.35rem .5rem; border-radius:.375rem; font-size:.72rem; white-space:nowrap; box-shadow:0 6px 20px rgba(0,0,0,.15);
-      opacity:0; pointer-events:none; transition:opacity .15s, transform .15s;
-      z-index:20;
+      opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:20;
     }
     .help[data-tip]::before{
       content:""; position:absolute; bottom:118%; left:50%; transform:translateX(-50%);
@@ -256,7 +255,6 @@ function nearestUSPlace(lat,lon){
     const d=hav(pt,{lat:p.lat,lon:p.lon});
     if(d<bestD){bestD=d; best=p;}
   }
-  // only accept if within ~120km
   return (bestD<=120) ? best.n : null;
 }
 
@@ -273,14 +271,12 @@ const geocodeCache=new Map();
 let geocodeQueue = Promise.resolve();
 
 async function nameIfUSLand(lat, lon, includeState=false){
-  // Fast offline guess first
   const offline = nearestUSPlace(lat,lon);
   if(offline) return offline;
 
   const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${includeState}`;
   if(geocodeCache.has(key)) return geocodeCache.get(key);
 
-  // gentle throttle + graceful fallback
   return geocodeQueue = geocodeQueue.then(async () => {
     await new Promise(r=>setTimeout(r,150));
     try{
@@ -312,6 +308,16 @@ async function fetchJSON(url, timeoutMs=9000){
   }finally{ clearTimeout(t); }
 }
 
+/* ========= thermo helpers ========= */
+function dewpointFromTRH(tF, rh){
+  // Magnus (over water)
+  const tC=(tF-32)*5/9;
+  const a=17.625, b=243.04;
+  const gamma = Math.log(Math.max(1e-6, rh/100)) + (a*tC)/(b+tC);
+  const dpC = (b*gamma)/(a-gamma);
+  return dpC*9/5+32;
+}
+
 /* ========= Weather service ========= */
 class Weather{
   constructor(){ this.cache=new Map(); this.CACHE=5*60*1000; }
@@ -321,7 +327,7 @@ class Weather{
     const c=this.cache.get(key);
     if(c && Date.now()-c.t<this.CACHE) return c.d;
 
-    // For bulk sampling (Twins/Roulette), skip NOAA entirely to avoid 404s & timeouts
+    // Prefer NOAA for "current" when not bulk
     if(!opts.bulk && approxUSLower48(lat,lon)){
       try{
         const p = await fetchJSON(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`,8000);
@@ -334,17 +340,26 @@ class Weather{
             try{
               const ob = await fetchJSON(`https://api.weather.gov/stations/${id}/observations/latest`,8000);
               const props=ob.properties||{};
-              const tC=props.temperature?.value, tdC=props.dewpoint?.value, pPa=props.barometricPressure?.value;
-              if(tC!=null && tdC!=null && pPa!=null){
+              const tC=props.temperature?.value;
+              const tdC=props.dewpoint?.value;
+              const pPa=props.barometricPressure?.value;
+              const rh = props.relativeHumidity?.value;
+              if(tC!=null && pPa!=null){
+                // start with NOAA values
+                let outDpF = (tdC!=null) ? (tdC*9/5+32) : dewpointFromTRH(tC*9/5+32, rh ?? 50);
                 const out={
                   temp: Math.round(tC*9/5+32),
-                  dewpoint: Math.round(tdC*9/5+32),
-                  humidity: Math.round(props.relativeHumidity?.value ?? 50),
+                  dewpoint: Math.round(outDpF),
+                  humidity: Math.round(rh ?? 50),
                   pressure: Math.round(pPa/100),
                   wind: Math.round(((props.windSpeed?.value)||0)*2.237),
                   timestamp: new Date(props.timestamp||Date.now()),
                   source: 'NOAA'
                 };
+                // guard: if model/obs reports Td==T but RH not ~100, recompute from T & RH
+                if(out.humidity!=null && out.humidity<97 && Math.abs(out.temp - out.dewpoint)<=0){
+                  out.dewpoint = Math.round(dewpointFromTRH(out.temp, out.humidity));
+                }
                 this.cache.set(key,{d:out,t:Date.now()});
                 return out;
               }
@@ -356,8 +371,11 @@ class Weather{
 
     // Open-Meteo fallback / bulk
     try{
-      const j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`,9000);
-      const out={
+      const j = await fetchJSON(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
+        `&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m`+
+        `&temperature_unit=fahrenheit&wind_speed_unit=mph`,9000);
+      let out={
         temp:Math.round(j.current.temperature_2m),
         dewpoint:Math.round(j.current.dew_point_2m),
         humidity:j.current.relative_humidity_2m,
@@ -366,6 +384,10 @@ class Weather{
         timestamp:new Date(),
         source:'Open-Meteo'
       };
+      // guard: Td==T but RH not saturated → recompute from T & RH
+      if(out.humidity!=null && out.humidity<97 && Math.abs(out.temp - out.dewpoint)<=0){
+        out.dewpoint = Math.round(dewpointFromTRH(out.temp, out.humidity));
+      }
       this.cache.set(key,{d:out,t:Date.now()});
       return out;
     }catch(e){ /* network issue */ }
@@ -373,21 +395,35 @@ class Weather{
     return {temp:72,dewpoint:55,humidity:50,pressure:1013,wind:5,timestamp:new Date(),source:'Fallback'};
   }
 
-  // Hourly model (dewpoint bias correction applied later)
+  // Hourly model (dewpoint bias correction + Td guard)
   async hourly(lat,lon){
     const j = await fetchJSON(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
-      `&current=dew_point_2m&hourly=dew_point_2m,temperature_2m,wind_speed_10m,precipitation_probability,cloud_cover`+
+      `&current=dew_point_2m`+
+      `&hourly=dew_point_2m,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,cloud_cover`+
       `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`,9000);
 
-    const hours=(j.hourly.time||[]).map((t,i)=>({
-      time:t,
-      dp: Math.round(j.hourly.dew_point_2m?.[i] ?? NaN),
-      temp: Math.round(j.hourly.temperature_2m?.[i] ?? NaN),
-      wind: Math.round(j.hourly.wind_speed_10m?.[i] ?? 0),
-      pop:  j.hourly.precipitation_probability?.[i] ?? null,
-      clouds: j.hourly.cloud_cover?.[i] ?? null
-    }));
+    const hours=(j.hourly.time||[]).map((t,i)=>{
+      const temp = Math.round(j.hourly.temperature_2m?.[i] ?? NaN);
+      const rh   = j.hourly.relative_humidity_2m?.[i] ?? null;
+      let dp  = Math.round(j.hourly.dew_point_2m?.[i] ?? NaN);
+
+      // guard per hour: recompute Td if suspicious
+      if(Number.isNaN(dp) || (rh!=null && rh<97 && Math.abs((dp??0) - temp)<=0)){
+        if(rh!=null && Number.isFinite(temp)) dp = Math.round(dewpointFromTRH(temp, rh));
+      }
+
+      return {
+        time:t,
+        dp,
+        temp,
+        rh: rh,
+        wind: Math.round(j.hourly.wind_speed_10m?.[i] ?? 0),
+        pop:  j.hourly.precipitation_probability?.[i] ?? null,
+        clouds: j.hourly.cloud_cover?.[i] ?? null
+      };
+    });
+
     const omCurrentDp = (j.current && j.current.dew_point_2m!=null)
       ? Math.round(j.current.dew_point_2m)
       : null;
@@ -399,7 +435,7 @@ const weather=new Weather();
 
 /* ========= Calcs ========= */
 function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.sqrt(rh+8.313659))+Math.atan(C+rh)-Math.atan(rh-1.676331)+0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)-4.686035;return Math.round(wb*9/5+32);}
-function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*rh/100;return (svp-avp).toFixed(2);}
+function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*(rh??50)/100;return (svp-avp).toFixed(2);}
 const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz}); // YYYY-MM-DD
@@ -412,7 +448,6 @@ let rouletteLayer=null;
 
 /* ========= Local panel ========= */
 async function updateLocal(){
-  // current, preferring NOAA if possible
   const d=await weather.get(userLocation.lat,userLocation.lon,{bulk:false});
   document.getElementById('temp').textContent=`${d.temp}°`;
   document.getElementById('dewpoint').textContent=`${d.dewpoint}°`;
@@ -448,7 +483,8 @@ async function updateLocal(){
   const bias = clamp(biasRaw, -8, 8);
   const correctedHours = (fc.hours||[]).map((h,idx)=>{
     const factor = idx<18 ? 1 : idx<48 ? 0.6 : 0.3;
-    const dp = Math.round(clamp((h.dp||0) + bias*factor, -40, 85));
+    let dp = h.dp;
+    if(Number.isFinite(dp)) dp = Math.round(clamp(dp + bias*factor, -40, 85));
     return {...h, dp};
   });
 
@@ -570,7 +606,6 @@ async function findTwins(){
     maps.twins.eachLayer(l=>{ if(l instanceof L.Marker || l instanceof L.CircleMarker) maps.twins.removeLayer(l); });
   }
 
-  // modest grid to avoid API strain
   const grid=[];
   for(let lat=26;lat<=48;lat+=3){
     for(let lon=-124;lon<=-67;lon+=4){
@@ -656,7 +691,6 @@ async function roulette(lat, lon){
   const oppName = opposite ? (await nameIfUSLand(opposite.lat, opposite.lon, true) || `${opposite.lat.toFixed(1)}°, ${Math.abs(opposite.lon).toFixed(1)}°W`) : '—';
   const wildName = wildcard ? (await nameIfUSLand(wildcard.lat, wildcard.lon, true) || `${wildcard.lat.toFixed(1)}°, ${Math.abs(wildcard.lon).toFixed(1)}°W`) : '—';
 
-  // Map pins (emoji only)
   if(rouletteLayer){ rouletteLayer.clearLayers(); } else { rouletteLayer=L.layerGroup().addTo(maps.roulette); }
   const youM = L.marker([lat,lon],{icon:emojiDivIcon('🎯')}).bindPopup(`<strong>${hereName}</strong><br>${clicked.temp}°F • dew ${clicked.dewpoint}°`).addTo(rouletteLayer);
   let oppM,wildM;
