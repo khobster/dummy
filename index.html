@@ -5,18 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dummy - Weather's Weird Side</title>
 
-  <!-- Favicon to stop 404 -->
   <link rel="icon" href="dummy_logo.png"/>
 
-  <!-- Leaflet -->
+  <!-- Leaflet core -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet.draw (for buttons + shapes) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+
+  <!-- Arrowheads on polylines -->
+  <script src="https://unpkg.com/leaflet-polylinedecorator@1.7.0/dist/leaflet.polylineDecorator.min.js"></script>
 
   <style>
     :root{
       --red:#dc2626; --blue:#3b82f6; --green:#10b981; --amber:#f59e0b;
-      --gray:#f3f4f6; --dark:#0f172a; --muted:#64748b; --card:#ffffff;
-      --tooltip:#111827;
+      --gray:#f3f4f6; --dark:#0f172a; --muted:#64748b; --card:#ffffff; --tooltip:#111827;
     }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--gray);color:var(--dark)}
@@ -30,7 +35,7 @@
     .location-control input{border:none;background:none;outline:none;width:220px}
 
     .tabs{display:flex;background:var(--card);padding:.5rem;gap:.5rem}
-    .tab{padding:.75rem 1.2rem;border:0;background:transparent;font-weight:700;cursor:pointer;border-radius:.5rem;transition:.2s}
+    .tab{padding:.75rem 1.5rem;border:0;background:transparent;font-weight:700;cursor:pointer;border-radius:.5rem;transition:.2s}
     .tab:hover{background:var(--gray)}
     .tab.active{background:var(--red);color:#fff}
 
@@ -38,18 +43,24 @@
     .section{display:none}
     .section.active{display:block}
 
-    .card{background:var(--card);border-radius:1rem;padding:1.25rem;margin:1rem 0;box-shadow:0 4px 20px rgba(0,0,0,.08)}
-    .map{height:500px;border-radius:1rem;overflow:hidden;margin:1rem 0}
+    .card{background:var(--card);border-radius:1rem;padding:1.5rem;margin:1rem 0;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+    .map{height:520px;border-radius:1rem;overflow:hidden;margin:1rem 0}
 
-    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin:1rem 0}
-    .metric{text-align:center;padding:1rem;background:#fff;border:1px solid #e5e7eb;border-radius:.75rem}
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin:1.5rem 0}
+    .metric{text-align:center;padding:1rem;background:var(--gray);border-radius:.75rem}
     .metric-value{font-size:2rem;font-weight:900;color:var(--red)}
     .metric-label{font-size:.75rem;text-transform:uppercase;color:var(--muted);margin-top:.25rem;display:flex;gap:.35rem;justify-content:center;align-items:center}
 
-    /* tooltips */
+    .insight{background:linear-gradient(90deg,rgba(59,130,246,.1),transparent);border-left:3px solid var(--blue);padding:1rem;margin:1rem 0;border-radius:0 .5rem .5rem 0}
+    .data-age{position:absolute;top:1rem;right:1rem;padding:.25rem .75rem;background:rgba(255,255,255,.9);border-radius:999px;font-size:.75rem;color:var(--muted)}
+
+    .timeline{display:flex;gap:.5rem;overflow:auto;padding:.25rem 0 .5rem}
+    .bucket{min-width:86px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:.5rem;text-align:center}
+    .bucket strong{display:block;font-size:.9rem}
+    .bucket .tval{font-size:1.2rem;font-weight:900;color:var(--red)}
+    .bucket .mini{font-size:.7rem;color:#64748b}
+
     .help{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e5e7eb;color:#334155;font-weight:900;font-size:.7rem;cursor:help;line-height:18px;position:relative}
-    .help:hover{background:#e2e8f0}
-    .help:focus{outline:2px solid #cbd5e1}
     .help[data-tip]::after{
       content:attr(data-tip);
       position:absolute; bottom:130%; left:50%; transform:translateX(-50%) translateY(4px);
@@ -60,36 +71,19 @@
       content:""; position:absolute; bottom:118%; left:50%; transform:translateX(-50%);
       border:6px solid transparent; border-top-color:var(--tooltip); opacity:0; transition:opacity .15s; z-index:19;
     }
-    .help[data-tip]:hover::after,.help[data-tip]:focus::after{opacity:1; transform:translateX(-50%) translateY(0)}
-    .help[data-tip]:hover::before,.help[data-tip]:focus::before{opacity:1}
+    .help:hover::after,.help:focus::after{opacity:1; transform:translateX(-50%) translateY(0)}
+    .help:hover::before,.help:focus::before{opacity:1}
 
-    .insight{background:linear-gradient(90deg,rgba(59,130,246,.1),transparent);border-left:3px solid var(--blue);padding:1rem;margin:1rem 0;border-radius:0 .5rem .5rem 0}
-    .data-age{position:absolute;top:1rem;right:1rem;padding:.25rem .75rem;background:rgba(255,255,255,.95);border-radius:999px;font-size:.75rem;color:var(--muted);border:1px solid #e5e7eb}
-
-    .timeline{display:flex;gap:.5rem;overflow:auto;padding:.25rem 0 .5rem}
-    .bucket{min-width:92px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.5rem;text-align:center}
-    .bucket strong{display:block;font-size:.9rem}
-    .bucket .tval{font-size:1.2rem;font-weight:900;color:var(--red)}
-    .bucket .mini{font-size:.7rem;color:#64748b}
-
-    /* chips / gauges */
-    .chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin:.5rem 0}
-    .chip{background:#fff;border:1px solid #e5e7eb;border-radius:.75rem;padding:.75rem}
-    .chip h4{font-size:.95rem;margin-bottom:.35rem;display:flex;gap:.4rem;align-items:center}
-    .gauge{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:.4rem 0}
-    .gauge>span{display:block;height:100%;background:linear-gradient(90deg,#06b6d4,#22c55e,#f59e0b,#ef4444);width:0%}
-    .caption{font-size:.75rem;color:#64748b}
-
-    /* Storm Lab */
-    .lab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:.5rem}
-    .lab-cell{background:#f8fafc;border:1px solid #e2e8f0;border-radius:.6rem;padding:.5rem;text-align:center}
-    .lab-badge{display:inline-block;padding:.15rem .4rem;border-radius:.4rem;font-size:.7rem;margin-top:.25rem}
-    .score-good{background:#dcfce7;color:#166534}
-    .score-mid{background:#fef9c3;color:#854d0e}
-    .score-bad{background:#fee2e2;color:#991b1b}
-
-    /* emoji pins */
     .emoji-pin{font-size:22px;line-height:22px;text-align:center;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))}
+
+    /* Storm Lab toolbar */
+    .radar-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+    .btn{background:#fff;border:1px solid #e5e7eb;border-radius:.5rem;padding:.5rem .75rem;cursor:pointer;font-weight:600}
+    .btn.tog.active{background:#0ea5e9;color:#fff;border-color:#0ea5e9}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .sep{width:1px;height:28px;background:#e5e7eb;margin:0 .25rem}
+    input[type="range"]{accent-color:#0ea5e9}
+    .pill{background:#eef2ff;color:#374151;border-radius:999px;padding:.25rem .6rem;font-size:.78rem}
   </style>
 </head>
 <body>
@@ -102,13 +96,13 @@
   <div class="location-control">
     <span>📍</span>
     <input type="text" id="locationInput" placeholder="Click map or enter coords (lat, lon)">
-    <button onclick="setLocation()">Set</button>
+    <button class="btn" onclick="setLocation()">Set</button>
   </div>
 </header>
 
 <nav class="tabs">
   <button class="tab active" onclick="switchTab(event,'local')">Your Weather</button>
-  <button class="tab" onclick="switchTab(event,'storm')">Storm Lab</button>
+  <button class="tab" onclick="switchTab(event,'stormlab')">Storm Lab</button>
   <button class="tab" onclick="switchTab(event,'roulette')">Weather Roulette</button>
 </nav>
 
@@ -118,66 +112,38 @@
     <div class="card" style="position:relative">
       <div class="data-age" id="dataAge">Data: -- min old</div>
       <h2>Your Exact Weather</h2>
-      <p style="color:var(--muted);margin-top:.5rem">Click anywhere on the map to change location</p>
+      <p style="color:var(--muted);margin-top:.5rem">Click anywhere on map to change location</p>
 
       <div class="metrics">
-        <div class="metric">
-          <div class="metric-value" id="temp">--°</div>
-          <div class="metric-label">Temperature</div>
-        </div>
+        <div class="metric"><div class="metric-value" id="temp">--°</div><div class="metric-label">Temperature</div></div>
         <div class="metric">
           <div class="metric-value" id="wetbulb">--°</div>
-          <div class="metric-label">
-            Wet Bulb
-            <span class="help" tabindex="0" data-tip="Approx temp felt by a wet surface. Great proxy for heat stress.">?</span>
-          </div>
+          <div class="metric-label">Wet Bulb <span class="help" tabindex="0" data-tip="Evaporative cooling benchmark; great proxy for heat stress.">?</span></div>
         </div>
         <div class="metric">
           <div class="metric-value" id="dewpoint">--°</div>
-          <div class="metric-label">
-            Dew Point
-            <span class="help" tabindex="0" data-tip="Moisture in the air: ~55° feels dry, 60–65° a bit humid, 70°+ tropical.">?</span>
-          </div>
+          <div class="metric-label">Dew Point <span class="help" tabindex="0" data-tip="~55° dry • 60–65° a bit humid • 70°+ tropical.">?</span></div>
         </div>
         <div class="metric">
           <div class="metric-value" id="vpd">-- kPa</div>
-          <div class="metric-label">
-            VPD
-            <span class="help" tabindex="0" data-tip="Vapor Pressure Deficit: how ‘thirsty’ the air is. 0–0.5 saturated • 0.5–2 comfy • >2 very dry.">?</span>
-          </div>
+          <div class="metric-label">VPD <span class="help" tabindex="0" data-tip="Air ‘thirst’. 0–0.5 saturated • 0.5–2 comfy • >2 very dry.">?</span></div>
         </div>
-        <div class="metric">
-          <div class="metric-value" id="spread">--°</div>
-          <div class="metric-label">
-            T–Td Spread
-            <span class="help" tabindex="0" data-tip="Gap between temp and dew point. Smaller gap = muggy & more condensation risk.">?</span>
-          </div>
-        </div>
-        <div class="metric">
-          <div class="metric-value" id="pressure">-- hPa</div>
-          <div class="metric-label">
-            Pressure
-            <span class="help" tabindex="0" data-tip="Sea-level pressure. ~1013 hPa average. Higher = calmer; lower = unsettled.">?</span>
-          </div>
-        </div>
+        <div class="metric"><div class="metric-value" id="spread">--°</div><div class="metric-label">T–Td Spread</div></div>
+        <div class="metric"><div class="metric-value" id="pressure">-- hPa</div><div class="metric-label">Pressure</div></div>
       </div>
 
       <div class="insight" id="moistureInsight">Analyzing moisture dynamics...</div>
       <div class="insight" id="condensationRisk">Condensation risk assessment...</div>
       <div class="insight" id="firepitHint">Checking tonight's fire-pit potential…</div>
 
-      <h3 style="margin-top:.75rem">Dew Point Forecast <span style="font-size:.8rem;color:var(--muted)">(NOAA-anchored)</span></h3>
+      <h3 style="margin-top:.5rem">Dew Point Forecast <span style="font-size:.8rem;color:var(--muted)">(NOAA-anchored)</span></h3>
       <p style="color:var(--muted);margin:.25rem 0 .5rem">Next 12 hours</p>
       <div id="dewTimeline" class="timeline"></div>
-
       <p style="color:var(--muted);margin:.5rem 0 .25rem">Next 5 days (min / max)</p>
       <div id="dewDays" class="timeline"></div>
 
-      <h3 style="margin-top:1rem">Outfit & Activities Today</h3>
-      <div id="advicePanel" class="chips"></div>
-
       <h3 style="margin-top:1rem">Fire Pit Forecast</h3>
-      <p style="color:var(--muted);margin:.25rem 0 .5rem">Best evenings this week</p>
+      <p style="color:var(--muted);margin:.25rem 0 .5rem">Best evenings this week for outdoor fires</p>
       <div id="fireDays" class="timeline"></div>
 
       <div id="localMap" class="map"></div>
@@ -185,18 +151,37 @@
   </section>
 
   <!-- Storm Lab -->
-  <section id="storm" class="section">
+  <section id="stormlab" class="section">
     <div class="card">
-      <h2>Storm Lab — Be the Meteorologist</h2>
-      <p style="color:var(--muted)">We surface the raw ingredients; you call the shot. Rising dew point, falling pressure, increasing clouds, CAPE, wind shift = rain chances going up.</p>
+      <h2>Storm Lab — Draw Your Own Forecast</h2>
+      <p style="color:var(--muted);margin:.25rem 0 1rem">
+        Watch the radar, then use the pen or arrow to sketch where you think the echoes will go. Shareable and fun.
+      </p>
 
-      <div id="labScoreWrap" class="chips" style="margin-top:.5rem"></div>
+      <div class="radar-toolbar" style="margin-bottom:.5rem">
+        <button id="prevFrame" class="btn">⏪ Prev</button>
+        <button id="playPause" class="btn tog">▶️ Play</button>
+        <button id="nextFrame" class="btn">⏩ Next</button>
+        <span class="sep"></span>
+        <span class="pill">Frame: <span id="radarTime">—</span></span>
+        <span class="sep"></span>
+        <label class="pill" style="display:flex;gap:.5rem;align-items:center">Opacity
+          <input id="radarOpacity" type="range" min="20" max="100" value="75">
+        </label>
+        <span class="sep"></span>
+        <button id="penBtn" class="btn tog">✏️ Pen</button>
+        <button id="arrowBtn" class="btn tog">➡️ Arrow</button>
+        <label class="pill" style="display:flex;gap:.35rem;align-items:center">Color
+          <input id="inkColor" type="color" value="#ef4444" style="border:none;background:transparent;width:28px;height:28px;padding:0">
+        </label>
+        <button id="undoBtn" class="btn">↩️ Undo</button>
+        <button id="clearBtn" class="btn">🧹 Clear</button>
+      </div>
 
-      <h3 style="margin-top:.75rem">Next 12 hours — DIY Raincast</h3>
-      <div id="stormTimeline" class="timeline"></div>
-
-      <h3 style="margin-top:1rem">Signals Dashboard</h3>
-      <div id="labSignals" class="lab-grid"></div>
+      <div id="radarMap" class="map"></div>
+      <p style="color:var(--muted);font-size:.85rem;margin-top:.25rem">
+        Sources: RainViewer (composite, nowcast) • Fallback: IEM/NEXRAD. Times are local. Drawing happens entirely in your browser.
+      </p>
     </div>
   </section>
 
@@ -204,7 +189,7 @@
   <section id="roulette" class="section">
     <div class="card">
       <h2>Weather Roulette</h2>
-      <p style="color:var(--muted)">Click anywhere in the US for a 3-way comparison + a quick “Rain ETA guess.”</p>
+      <p style="color:var(--muted)">Click anywhere on the map for a 3-way comparison</p>
       <div id="rouletteMap" class="map"></div>
       <div id="rouletteResults"><p style="text-align:center;color:var(--muted)">Click on the map to spin the weather roulette!</p></div>
     </div>
@@ -212,310 +197,93 @@
 </div>
 
 <script>
-/* ========= small US place set (offline fallback for names) ========= */
-const US_PLACES = [
-  {n:"New York, NY",lat:40.7128,lon:-74.0060},{n:"Los Angeles, CA",lat:34.0522,lon:-118.2437},
-  {n:"Chicago, IL",lat:41.8781,lon:-87.6298},{n:"Houston, TX",lat:29.7604,lon:-95.3698},
-  {n:"Phoenix, AZ",lat:33.4484,lon:-112.0740},{n:"Philadelphia, PA",lat:39.9526,lon:-75.1652},
-  {n:"San Antonio, TX",lat:29.4241,lon:-98.4936},{n:"San Diego, CA",lat:32.7157,lon:-117.1611},
-  {n:"Dallas, TX",lat:32.7767,lon:-96.7970},{n:"San Jose, CA",lat:37.3382,lon:-121.8863},
-  {n:"Atlanta, GA",lat:33.7490,lon:-84.3880},{n:"Miami, FL",lat:25.7617,lon:-80.1918},
-  {n:"Charleston, SC",lat:32.7765,lon:-79.9311},{n:"Columbia, SC",lat:34.0007,lon:-81.0348},
-  {n:"Greenville, SC",lat:34.8526,lon:-82.3940},{n:"Savannah, GA",lat:32.0809,lon:-81.0912},
-  {n:"Raleigh, NC",lat:35.7796,lon:-78.6382},{n:"Richmond, VA",lat:37.5407,lon:-77.4360},
-  {n:"Burlington, VT",lat:44.4759,lon:-73.2121},{n:"Huger, SC",lat:33.0318,lon:-79.7287}
-];
-
-/* ========= helpers ========= */
+/* ========================= Small helpers & constants ========================= */
 const R2D = Math.PI/180;
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const fmtTime = iso => new Date(iso).toLocaleTimeString('en-US',{hour:'numeric'});
-const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz}); // YYYY-MM-DD
+const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz});
 const todayKeyInTz=(tz)=> new Date().toLocaleDateString('en-CA',{timeZone:tz});
-
-function hav(a,b){const R=6371;const dLat=(b.lat-a.lat)*R2D;const dLon=(b.lon-a.lon)*R2D;const la1=a.lat*R2D;const la2=b.lat*R2D;const s1=Math.sin(dLat/2), s2=Math.sin(dLon/2);const c=2*Math.asin(Math.sqrt(s1*s1+Math.cos(la1)*Math.cos(la2)*s2*s2));return R*c;}
-function nearestUSPlace(lat,lon){
-  let best=null,bestD=1e9,pt={lat,lon};
-  for(const p of US_PLACES){
-    const d=hav(pt,{lat:p.lat,lon:p.lon});
-    if(d<bestD){bestD=d; best=p;}
-  }
-  return (bestD<=120) ? best.n : null;
-}
-
-/* ========= US-only helpers ========= */
-function approxUSLower48(lat, lon){
-  if(lat<25 || lat>49.5 || lon<-125 || lon>-66) return false;
-  if(lat<28.6 && lon>-97 && lon<-80) return false;     // Gulf
-  if(lon>-78 && lat<34.6) return false;                // Atlantic shelf
-  if(lat<31.3 && lon>-117 && lon<-98) return false;    // N. Mexico band
-  return true;
-}
-
-const geocodeCache=new Map();
-let geocodeQueue = Promise.resolve();
-
-async function nameIfUSLand(lat, lon, includeState=false){
-  const offline = nearestUSPlace(lat,lon);
-  if(offline) return offline;
-
-  const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${includeState}`;
-  if(geocodeCache.has(key)) return geocodeCache.get(key);
-
-  return geocodeQueue = geocodeQueue.then(async () => {
-    await new Promise(r=>setTimeout(r,150));
-    try{
-      const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1&accept-language=en&countrycodes=us`;
-      const r=await fetch(url,{method:'GET'});
-      if(!r.ok){ geocodeCache.set(key,null); return null; }
-      const j=await r.json();
-      const a=j.address||{};
-      const waterWords=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];
-      if(waterWords.some(w=>j.display_name?.includes(w))){ geocodeCache.set(key,null); return null; }
-      let label=(a.city||a.town||a.village||a.hamlet||a.county||'').toString();
-      if(!label && a.state) label=a.state;
-      if(!label){ geocodeCache.set(key,null); return null; }
-      if(includeState && a.state) label = `${label}, ${a.state}`;
-      geocodeCache.set(key,label);
-      return label;
-    }catch{ geocodeCache.set(key,null); return null; }
-  });
-}
-
-/* ========= fetch helper with timeout ========= */
-async function fetchJSON(url, timeoutMs=9000){
-  const ctrl = new AbortController();
-  const t = setTimeout(()=>ctrl.abort('timeout'), timeoutMs);
-  try{
-    const resp = await fetch(url,{signal:ctrl.signal});
-    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return await resp.json();
-  }finally{ clearTimeout(t); }
-}
-
-/* ========= thermo helpers ========= */
-function dewpointFromTRH(tF, rh){
-  // Magnus (over water)
-  const tC=(tF-32)*5/9;
-  const a=17.625, b=243.04;
-  const gamma = Math.log(Math.max(1e-6, rh/100)) + (a*tC)/(b+tC);
-  const dpC = (b*gamma)/(a-gamma);
-  return dpC*9/5+32;
-}
+const fetchJSON = async (url, timeoutMs=9000) => {
+  const ctrl = new AbortController(); const t=setTimeout(()=>ctrl.abort('timeout'),timeoutMs);
+  try{ const r=await fetch(url,{signal:ctrl.signal}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  finally{ clearTimeout(t); }
+};
 
 function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.sqrt(rh+8.313659))+Math.atan(C+rh)-Math.atan(rh-1.676331)+0.00391838*Math.pow(rh,1.5)*Math.atan(0.023101*rh)-4.686035;return Math.round(wb*9/5+32);}
 function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*(rh??50)/100;return (svp-avp).toFixed(2);}
+function dewpointFromTRH(tF, rh){const tC=(tF-32)*5/9;const a=17.625,b=243.04;const g=Math.log(Math.max(1e-6,rh/100))+(a*tC)/(b+tC);return (b*g)/(a-g)*9/5+32;}
 
-/* ========= Weather service ========= */
+function approxUSLower48(lat, lon){
+  if(lat<25 || lat>49.5 || lon<-125 || lon>-66) return false;
+  if(lat<28.6 && lon>-97 && lon<-80) return false;
+  if(lon>-78 && lat<34.6) return false;
+  if(lat<31.3 && lon>-117 && lon<-98) return false;
+  return true;
+}
+
+/* ========================= Weather engine (NOAA → OM fallback) ========================= */
 class Weather{
   constructor(){ this.cache=new Map(); this.CACHE=5*60*1000; }
 
   async get(lat,lon,opts={bulk:false}){
     const key=`${lat.toFixed(2)},${lon.toFixed(2)}${opts.bulk?'|b':''}`;
-    const c=this.cache.get(key);
-    if(c && Date.now()-c.t<this.CACHE) return c.d;
+    const c=this.cache.get(key); if(c && Date.now()-c.t<this.CACHE) return c.d;
 
-    // Prefer NOAA for "current" when not bulk
     if(!opts.bulk && approxUSLower48(lat,lon)){
       try{
-        const p = await fetchJSON(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`,8000);
+        const p=await fetchJSON(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`,8000);
         if(p?.properties?.observationStations){
-          const stations = await fetchJSON(p.properties.observationStations,8000);
-          const feats=(stations.features||[]).slice(0,6);
-          for(const f of feats){
-            const id=f.properties?.stationIdentifier;
-            if(!id) continue;
+          const stations=await fetchJSON(p.properties.observationStations,8000);
+          for(const f of (stations.features||[]).slice(0,6)){
             try{
-              const ob = await fetchJSON(`https://api.weather.gov/stations/${id}/observations/latest`,8000);
-              const props=ob.properties||{};
-              const tC=props.temperature?.value;
-              const tdC=props.dewpoint?.value;
-              const pPa=props.barometricPressure?.value;
-              const rh = props.relativeHumidity?.value;
+              const id=f.properties?.stationIdentifier; if(!id) continue;
+              const ob=await fetchJSON(`https://api.weather.gov/stations/${id}/observations/latest`,8000);
+              const pr=ob.properties||{};
+              const tC=pr.temperature?.value, tdC=pr.dewpoint?.value, pPa=pr.barometricPressure?.value, rh=pr.relativeHumidity?.value;
               if(tC!=null && pPa!=null){
-                let outDpF = (tdC!=null) ? (tdC*9/5+32) : dewpointFromTRH(tC*9/5+32, rh ?? 50);
-                const out={
-                  temp: Math.round(tC*9/5+32),
-                  dewpoint: Math.round(outDpF),
-                  humidity: Math.round(rh ?? 50),
-                  pressure: Math.round(pPa/100),
-                  wind: Math.round(((props.windSpeed?.value)||0)*2.237),
-                  timestamp: new Date(props.timestamp||Date.now()),
-                  source: 'NOAA'
-                };
-                // guard: if Td==T but RH not ~100, recompute from T & RH
-                if(out.humidity!=null && out.humidity<97 && Math.abs(out.temp - out.dewpoint)<=0){
-                  out.dewpoint = Math.round(dewpointFromTRH(out.temp, out.humidity));
-                }
-                this.cache.set(key,{d:out,t:Date.now()});
-                return out;
+                let outDp=(tdC!=null)?(tdC*9/5+32):dewpointFromTRH(tC*9/5+32, rh??50);
+                let out={ temp:Math.round(tC*9/5+32), dewpoint:Math.round(outDp), humidity:Math.round(rh??50),
+                          pressure:Math.round(pPa/100), wind:Math.round(((pr.windSpeed?.value)||0)*2.237),
+                          timestamp:new Date(pr.timestamp||Date.now()), source:'NOAA' };
+                if(out.humidity<97 && Math.abs(out.temp-out.dewpoint)<=0){ out.dewpoint=Math.round(dewpointFromTRH(out.temp,out.humidity)); }
+                this.cache.set(key,{d:out,t:Date.now()}); return out;
               }
-            }catch{/* try next station */}
+            }catch{}
           }
         }
-      }catch{/* fall through */}
+      }catch{}
     }
-
-    // Open-Meteo fallback / bulk
     try{
-      const j = await fetchJSON(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
-        `&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m`+
-        `&temperature_unit=fahrenheit&wind_speed_unit=mph`,9000);
-      let out={
-        temp:Math.round(j.current.temperature_2m),
-        dewpoint:Math.round(j.current.dew_point_2m),
-        humidity:j.current.relative_humidity_2m,
-        pressure:Math.round(j.current.surface_pressure),
-        wind:Math.round(j.current.wind_speed_10m),
-        timestamp:new Date(),
-        source:'Open-Meteo'
-      };
-      // guard: Td==T but RH not saturated → recompute from T & RH
-      if(out.humidity!=null && out.humidity<97 && Math.abs(out.temp - out.dewpoint)<=0){
-        out.dewpoint = Math.round(dewpointFromTRH(out.temp, out.humidity));
-      }
-      this.cache.set(key,{d:out,t:Date.now()});
-      return out;
-    }catch(e){ /* network issue */ }
-
+      const j=await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,dew_point_2m,surface_pressure,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`,9000);
+      let out={ temp:Math.round(j.current.temperature_2m), dewpoint:Math.round(j.current.dew_point_2m), humidity:j.current.relative_humidity_2m,
+                pressure:Math.round(j.current.surface_pressure), wind:Math.round(j.current.wind_speed_10m), timestamp:new Date(), source:'Open-Meteo' };
+      if(out.humidity<97 && Math.abs(out.temp-out.dewpoint)<=0){ out.dewpoint=Math.round(dewpointFromTRH(out.temp,out.humidity)); }
+      this.cache.set(key,{d:out,t:Date.now()}); return out;
+    }catch{}
     return {temp:72,dewpoint:55,humidity:50,pressure:1013,wind:5,timestamp:new Date(),source:'Fallback'};
   }
 
-  // Hourly model (dewpoint bias correction + Td guard + past day & CAPE/LI)
   async hourly(lat,lon){
-    const j = await fetchJSON(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
-      `&past_days=1&forecast_days=3`+
-      `&current=dew_point_2m`+
-      `&hourly=dew_point_2m,temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,`+
-      `precipitation_probability,precipitation,cloud_cover,pressure_msl,cape,lifted_index`+
-      `&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`,9000);
-
+    const j=await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=dew_point_2m&hourly=dew_point_2m,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,cloud_cover&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`,9000);
     const hours=(j.hourly.time||[]).map((t,i)=>{
-      const temp = Math.round(j.hourly.temperature_2m?.[i] ?? NaN);
-      const rh   = j.hourly.relative_humidity_2m?.[i] ?? null;
-      let dp  = Math.round(j.hourly.dew_point_2m?.[i] ?? NaN);
-
-      // guard per hour: recompute Td if suspicious
-      if(Number.isNaN(dp) || (rh!=null && rh<97 && Math.abs((dp??0) - temp)<=0)){
-        if(rh!=null && Number.isFinite(temp)) dp = Math.round(dewpointFromTRH(temp, rh));
-      }
-
-      return {
-        time:t,
-        dp,
-        temp,
-        rh,
-        wind: Math.round(j.hourly.wind_speed_10m?.[i] ?? 0),
-        wdir: Math.round(j.hourly.wind_direction_10m?.[i] ?? 0),
-        pop:  j.hourly.precipitation_probability?.[i] ?? null,
-        precip: j.hourly.precipitation?.[i] ?? 0,
-        clouds: j.hourly.cloud_cover?.[i] ?? null,
-        pmsl: j.hourly.pressure_msl?.[i] ?? null,
-        cape: j.hourly.cape?.[i] ?? null,
-        li:   j.hourly.lifted_index?.[i] ?? null
-      };
+      const temp=Math.round(j.hourly.temperature_2m?.[i] ?? NaN);
+      const rh=j.hourly.relative_humidity_2m?.[i] ?? null;
+      let dp=Math.round(j.hourly.dew_point_2m?.[i] ?? NaN);
+      if(Number.isNaN(dp) || (rh!=null && rh<97 && Math.abs((dp??0)-temp)<=0)){ if(rh!=null && Number.isFinite(temp)) dp=Math.round(dewpointFromTRH(temp,rh)); }
+      return { time:t, dp, temp, rh, wind:Math.round(j.hourly.wind_speed_10m?.[i] ?? 0), pop:j.hourly.precipitation_probability?.[i] ?? null, clouds:j.hourly.cloud_cover?.[i] ?? null };
     });
-
-    const omCurrentDp = (j.current && j.current.dew_point_2m!=null)
-      ? Math.round(j.current.dew_point_2m)
-      : null;
-
-    return {hours, omCurrentDp, tz: j.timezone || 'UTC'};
+    const omCurrentDp = (j.current && j.current.dew_point_2m!=null) ? Math.round(j.current.dew_point_2m) : null;
+    return {hours, omCurrentDp, tz:j.timezone||'UTC'};
   }
 }
 const weather=new Weather();
 
-/* ========= State & maps ========= */
+/* ========================= State & maps ========================= */
 let userLocation={lat:40.7128,lon:-74.0060};
-let maps={};
-let rouletteLayer=null;
+let maps={}; let rouletteLayer=null;
 
-/* ========= Advice & scores ========= */
-function outfitAdvice(temp, dp, wind){
-  const lines=[];
-  if(temp>=88){ lines.push("Tank/tee + shorts"); }
-  else if(temp>=75){ lines.push("T-shirt + shorts/light pants"); }
-  else if(temp>=62){ lines.push("Light long sleeve or hoodie"); }
-  else if(temp>=48){ lines.push("Jacket + pants"); }
-  else { lines.push("Warm coat, insulated layers"); }
-  if(dp>=70) lines.push("Breathable fabrics (very humid)");
-  if(wind>=18) lines.push("Windbreaker (breezy)");
-  return lines.join(" • ");
-}
-function scoreWindowsDown(temp, dp, wind, pop1h){
-  let s=100;
-  if(temp<58) s-= (58-temp)*2;
-  if(temp>86) s-= (temp-86)*2;
-  if(dp>65) s-= (dp-65)*2;
-  if(wind>22) s-= (wind-22)*3;
-  if(pop1h>30) s-= (pop1h-30)*1.2;
-  return clamp(Math.round(s),0,100);
-}
-function scoreRunOutside(temp, dp, wind, pop3h){
-  // best around 45–65°F, dp < 60, wind < 15, low rain
-  let s=100;
-  if(temp<40) s-= (40-temp)*2;
-  if(temp>72) s-= (temp-72)*2;
-  if(dp>60) s-= (dp-60)*2.5;
-  if(wind>15) s-= (wind-15)*2;
-  if(pop3h>40) s-= (pop3h-40)*1.2;
-  return clamp(Math.round(s),0,100);
-}
-function scoreOpenWindows(temp, dp, pop6h){
-  // best when dp 45–55, temp 60–74, little rain
-  let s=100;
-  if(dp<42) s-= (42-dp)*1.2;
-  if(dp>58) s-= (dp-58)*2.5;
-  if(temp<58) s-= (58-temp)*1.5;
-  if(temp>78) s-= (temp-78)*1.5;
-  if(pop6h>30) s-= (pop6h-30);
-  return clamp(Math.round(s),0,100);
-}
-function chip(title, emoji, score, blurb){
-  const color = score>=80?'#16a34a':score>=60?'#f59e0b':score>=40?'#64748b':'#dc2626';
-  return `<div class="chip">
-    <h4>${emoji} ${title} <span style="margin-left:auto;font-weight:800;color:${color}">${score}</span></h4>
-    <div class="gauge"><span style="width:${score}%"></span></div>
-    <div class="caption">${blurb}</div>
-  </div>`;
-}
-
-/* ========= Storm Lab scoring ========= */
-function nowcastScorePoint(h, prev3, prevPres3){
-  // Combine ingredients for a “soon rain” feel
-  // pop (50%), cloud (10%), dewpoint rising vs 3h ago (15%), pressure fall vs 3h ago (15%), CAPE/LI (10%)
-  let s=0;
-  const pop = h.pop ?? 0;
-  const clouds = h.clouds ?? 0;
-  const cape = h.cape ?? 0;
-  const li = h.li ?? 2;
-
-  // trends
-  let dpTrend = 0, pFall = 0;
-  if(prev3){
-    const prevDp = prev3.reduce((a,b)=>a+(b.dp??0),0)/prev3.length;
-    dpTrend = clamp((h.dp - prevDp), -8, 8); // °F change
-  }
-  if(prevPres3){
-    const prevP = prevPres3.reduce((a,b)=>a+(b.pmsl??h.pmsl),0)/prevPres3.length;
-    pFall = clamp((prevP - h.pmsl), -8, 8);  // hPa fall (positive if falling)
-  }
-
-  s += pop*0.5;
-  s += (clouds*0.1);
-  s += clamp((dpTrend*4), -20, 20);      // + if dew rising
-  s += clamp((pFall*3), -20, 20);        // + if pressure falling
-  s += clamp((cape/50), 0, 10);          // 0–10
-  if(li<=0) s += clamp((-li*2), 0, 10);  // more if LI negative
-
-  return clamp(Math.round(s),0,100);
-}
-
-/* ========= Local panel ========= */
+/* ========================= Your Weather panel ========================= */
 async function updateLocal(){
-  // current, preferring NOAA if possible
   const d=await weather.get(userLocation.lat,userLocation.lon,{bulk:false});
   document.getElementById('temp').textContent=`${d.temp}°`;
   document.getElementById('dewpoint').textContent=`${d.dewpoint}°`;
@@ -526,86 +294,44 @@ async function updateLocal(){
   const age=Math.max(0,Math.round((Date.now()-d.timestamp)/60000));
   document.getElementById('dataAge').textContent=`Data: ${age} min old (${d.source})`;
 
-  // Insights
   const spread=d.temp-d.dewpoint;
-  const moist=spread<5?'⚠️ Near saturation — fog/mist likely'
-              :spread<10?'Very humid — condensation on cold surfaces'
-              :spread<20?'Comfortable moisture levels'
-              :'Dry air — static electricity likely';
+  const moist=spread<5?'⚠️ Near saturation — fog/mist likely':spread<10?'Very humid — condensation on cold surfaces':spread<20?'Comfortable moisture levels':'Dry air — static electricity likely';
   const dv=vpd(d.temp,d.humidity);
-  document.getElementById('moistureInsight').innerHTML=
-    `<strong>Moisture Status:</strong> ${moist}<br>`+
-    `<strong>VPD ${dv} kPa:</strong> ${dv<0.5?'Air is saturated':dv>2?'Air is very thirsty':'Moderate moisture demand'}`;
+  document.getElementById('moistureInsight').innerHTML=`<strong>Moisture Status:</strong> ${moist}<br><strong>VPD ${dv} kPa:</strong> ${dv<0.5?'Air is saturated':dv>2?'Air is very thirsty':'Moderate moisture demand'}`;
 
   const surfaces=[{name:'Windows',temp:d.temp-15},{name:'Walls',temp:d.temp-8},{name:'Metal objects',temp:d.temp-20}];
   const risks=surfaces.filter(s=>s.temp<=d.dewpoint).map(s=>s.name);
-  document.getElementById('condensationRisk').innerHTML=
-    risks.length?`⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}`:
-                  `✓ <strong>No condensation risk</strong> — all surfaces above dew point`;
+  document.getElementById('condensationRisk').innerHTML=risks.length?`⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}`:`✓ <strong>No condensation risk</strong> — all surfaces above dew point`;
 
-  // model hourly + bias correction to NOAA
-  let fc;
-  try { fc=await weather.hourly(userLocation.lat,userLocation.lon); }
-  catch { fc={hours:[],omCurrentDp:null,tz:'UTC'}; }
+  let fc; try{ fc=await weather.hourly(userLocation.lat,userLocation.lon);}catch{ fc={hours:[],omCurrentDp:null,tz:'UTC'}; }
+  const biasRaw=(fc.omCurrentDp!=null && Number.isFinite(d.dewpoint))?(d.dewpoint-fc.omCurrentDp):0;
+  const bias=clamp(biasRaw,-8,8);
+  const corrected=(fc.hours||[]).map((h,idx)=>{ const f=idx<18?1:idx<48?0.6:0.3; const dp=Math.round(clamp((h.dp||0)+bias*f,-40,85)); return {...h,dp}; });
 
-  const biasRaw = (fc.omCurrentDp!=null && Number.isFinite(d.dewpoint)) ? (d.dewpoint - fc.omCurrentDp) : 0;
-  const bias = clamp(biasRaw, -8, 8);
-  const correctedHours = (fc.hours||[]).map((h,idx)=>{
-    const factor = idx<18 ? 1 : idx<48 ? 0.6 : 0.3;
-    let dp = h.dp;
-    if(Number.isFinite(dp)) dp = Math.round(clamp(dp + bias*factor, -40, 85));
-    return {...h, dp};
-  });
-
-  /* === Dew point timelines === */
   const tl=document.getElementById('dewTimeline'); tl.innerHTML='';
-  const nowAbs=new Date();
-  const next12 = correctedHours.filter(h => new Date(h.time) > nowAbs).slice(0,12);
-  (next12.length?next12:correctedHours.slice(0,12)).forEach(h=>{
-    const el=document.createElement('div');
-    el.className='bucket';
-    el.innerHTML=`<strong>${fmtTime(h.time)}</strong>`+
-                 `<div class="tval">${h.dp}°</div>`+
-                 `<div class="mini">${(h.pop??'–')}% precip • ${h.wind} mph</div>`;
+  const now=new Date(); const next12=corrected.filter(h=>new Date(h.time)>now).slice(0,12);
+  (next12.length?next12:corrected.slice(0,12)).forEach(h=>{
+    const el=document.createElement('div'); el.className='bucket';
+    el.innerHTML=`<strong>${fmtTime(h.time)}</strong><div class="tval">${h.dp}°</div><div class="mini">${(h.pop??'–')}% precip • ${h.wind} mph</div>`;
     tl.appendChild(el);
   });
 
-  const tz = fc.tz || 'UTC';
-  const todayKey = todayKeyInTz(tz);
-  const groups=new Map();
-  correctedHours.forEach(h=>{
-    const key=dateKeyInTz(h.time, tz);
-    if(key>=todayKey){
-      if(!groups.has(key)) groups.set(key,[]);
-      groups.get(key).push(h);
-    }
-  });
-  const dayKeys=[...groups.keys()].sort();
+  const tz=fc.tz||'UTC', todayKey=todayKeyInTz(tz); const groups=new Map();
+  corrected.forEach(h=>{ const k=dateKeyInTz(h.time,tz); if(k>=todayKey){ if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(h);} });
+  const keys=[...groups.keys()].sort();
 
-  const daysEl=document.getElementById('dewDays'); daysEl.innerHTML='';
-  dayKeys.slice(0,5).forEach(k=>{
-    const arr=groups.get(k)||[];
-    if(!arr.length) return;
-    const min=Math.min(...arr.map(x=>x.dp));
-    const max=Math.max(...arr.map(x=>x.dp));
-    const el=document.createElement('div');
-    el.className='bucket';
-    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short', timeZone: tz})}</strong>`+
-                 `<div class="tval">${min}° – ${max}°</div>`+
-                 `<div class="mini">min / max dew</div>`;
-    daysEl.appendChild(el);
+  const dd=document.getElementById('dewDays'); dd.innerHTML='';
+  keys.slice(0,5).forEach(k=>{ const arr=groups.get(k)||[]; if(!arr.length) return;
+    const min=Math.min(...arr.map(x=>x.dp)), max=Math.max(...arr.map(x=>x.dp));
+    const el=document.createElement('div'); el.className='bucket';
+    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',timeZone:tz})}</strong><div class="tval">${min}° – ${max}°</div><div class="mini">min / max dew</div>`;
+    dd.appendChild(el);
   });
 
-  /* === Fire pit (evenings only) === */
-  const fireEl=document.getElementById('fireDays'); fireEl.innerHTML='';
-  dayKeys.forEach(k=>{
-    const arr=(groups.get(k)||[]).filter(h=>{
-      const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz});
-      const hInt=parseInt(hr,10);
-      return hInt>=18 && hInt<=23;
-    });
+  const fire=document.getElementById('fireDays'); fire.innerHTML='';
+  keys.forEach(k=>{
+    const arr=(groups.get(k)||[]).filter(h=>{const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz}); const h=parseInt(hr,10); return h>=18&&h<=23;});
     if(!arr.length) return;
-
     const avgDew=Math.round(arr.reduce((a,b)=>a+b.dp,0)/arr.length);
     const avgTemp=Math.round(arr.reduce((a,b)=>a+b.temp,0)/arr.length);
     const maxWind=Math.max(...arr.map(h=>h.wind));
@@ -613,205 +339,172 @@ async function updateLocal(){
     const avgClouds=Math.round(arr.reduce((a,b)=>a+(Number.isFinite(b.clouds)?b.clouds:50),0)/arr.length);
 
     let score=100;
-    if(avgDew<35) score-= (35-avgDew)*2.5;
-    if(avgDew>55) score-= (avgDew-55)*2.5;
-    if(maxWind>10) score-= (maxWind-10)*3;
-    if(maxWind>20) score=0;
-    score-= maxPop*0.8;
-    if(avgClouds>30) score-= (avgClouds-30)*0.5;
-    if(avgTemp<55) score-= (55-avgTemp);
-    if(avgTemp>75) score-= (avgTemp-75)*0.5;
-    score=Math.max(0,Math.min(100,score));
+    if(avgDew<35) score-=(35-avgDew)*2.5; if(avgDew>55) score-=(avgDew-55)*2.5;
+    if(maxWind>10) score-=(maxWind-10)*3; if(maxWind>20) score=0;
+    score-=maxPop*0.8; if(avgClouds>30) score-=(avgClouds-30)*0.5;
+    if(avgTemp<55) score-=(55-avgTemp); if(avgTemp>75) score-=(avgTemp-75)*0.5;
+    score=clamp(Math.round(score),0,100);
 
-    let rating='',color='';
-    if(score>=80){rating='🔥🔥🔥';color='#10b981';}
-    else if(score>=60){rating='🔥🔥';color='#f59e0b';}
-    else if(score>=40){rating='🔥';color='#64748b';}
-    else {rating='❌';color='#dc2626';}
+    let rating='',color=''; if(score>=80){rating='🔥🔥🔥';color='#10b981';} else if(score>=60){rating='🔥🔥';color='#f59e0b';}
+    else if(score>=40){rating='🔥';color='#64748b';} else {rating='❌';color='#dc2626';}
 
-    const el=document.createElement('div');
-    el.className='bucket';
-    el.style.minWidth='100px';
-    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short', timeZone: tz})}</strong>
+    const el=document.createElement('div'); el.className='bucket'; el.style.minWidth='100px';
+    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',timeZone:tz})}</strong>
       <div style="font-size:1.5rem">${rating}</div>
-      <div class="mini" style="color:${color}">${Math.round(score)}% ideal</div>
+      <div class="mini" style="color:${color}">${score}% ideal</div>
       <div class="mini" style="font-size:.6rem">${avgTemp}°F • ${maxWind}mph<br>${maxPop}% rain • ${avgClouds}% clouds</div>`;
-    fireEl.appendChild(el);
+    fire.appendChild(el);
   });
 
-  // Tonight hint
-  const tonightKey = dayKeys[0];
+  const tonightKey=keys[0];
   if(tonightKey){
-    const tonightArr=(groups.get(tonightKey)||[]).filter(h=>{
-      const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz});
-      const hInt=parseInt(hr,10);
-      return hInt>=18 && hInt<=23;
-    });
-    if(tonightArr.length){
-      const avgDP=Math.round(tonightArr.reduce((a,b)=>a+b.dp,0)/tonightArr.length);
-      const maxWind=Math.max(...tonightArr.map(h=>h.wind));
-      const maxPop=Math.max(...tonightArr.map(h=>h.pop??0));
+    const arr=(groups.get(tonightKey)||[]).filter(h=>{const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz}); const h=parseInt(hr,10); return h>=18&&h<=23;});
+    if(arr.length){
+      const avgDP=Math.round(arr.reduce((a,b)=>a+b.dp,0)/arr.length);
+      const maxWind=Math.max(...arr.map(h=>h.wind));
+      const maxPop=Math.max(...arr.map(h=>h.pop??0));
       const good=(avgDP>=35&&avgDP<=55)&&maxWind<=12&&maxPop<25;
-      document.getElementById('firepitHint').innerHTML=good
-        ? `🔥 <strong>Good fire-pit tonight:</strong> avg dew ${avgDP}°, wind ≤${maxWind} mph, precip ≤${maxPop}%`
-        : `🪵 <strong>Meh for fire-pit:</strong> avg dew ${avgDP}°, wind up to ${maxWind} mph, precip up to ${maxPop}%`;
-    }else{
-      document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
+      document.getElementById('firepitHint').innerHTML=good?`🔥 <strong>Good fire-pit tonight:</strong> avg dew ${avgDP}°, wind ≤${maxWind} mph, precip ≤${maxPop}%`:`🪵 <strong>Meh for fire-pit:</strong> avg dew ${avgDP}°, wind up to ${maxWind} mph, precip up to ${maxPop}%`;
+    }else document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
+  }else document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
+}
+
+/* ========================= Storm Lab: Radar + telestrator ========================= */
+const Radar = {
+  frames: [],    // {label, layer}
+  idx: 0,        // current frame index
+  timer: null,
+  playing: false,
+  opacity: 0.75,
+  drawings: null, // L.FeatureGroup
+  color: '#ef4444',
+  penMode: false,
+  arrowMode: false,
+  penActive: null, // current polyline in pen mode
+  arrowPts: []     // click-click for arrow line
+};
+
+// Build a set of radar layers (RainViewer nowcast 0..8 → fallback IEM)
+async function buildRadarLayers() {
+  Radar.frames = [];
+  // primary: RainViewer nowcast tiles (0=latest, higher=future)
+  const tryRainviewer = (i) => L.tileLayer(`https://tilecache.rainviewer.com/v2/radar/nowcast_${i}/256/{z}/{x}/{y}/2/1_1.png`, {
+    opacity: Radar.opacity, zIndex: 400, crossOrigin: true, errorTileUrl: ''
+  });
+  // fallback: IEM NEXRAD composite (static)
+  const iem = () => L.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/radar/{z}/{x}/{y}.png', {
+    opacity: Radar.opacity, zIndex: 400, crossOrigin: true
+  });
+
+  // Probe RainViewer tile 0 once to see if it loads
+  let rainviewerOK = true;
+  await new Promise((resolve)=>{
+    const probe=tryRainviewer(0);
+    let settled=false;
+    const done=(ok)=>{ if(!settled){ settled=true; rainviewerOK=ok; maps.radar.removeLayer(probe); resolve(); } };
+    probe.on('tileerror',()=>done(false));
+    probe.on('load',()=>done(true));
+    probe.addTo(maps.radar);
+    setTimeout(()=>done(true), 1200); // be optimistic after a second
+  });
+
+  if(rainviewerOK){
+    // 0..8 frames (about ~+80 min nowcast where available)
+    const count=9;
+    for(let i=0;i<count;i++){
+      const lyr=tryRainviewer(i);
+      Radar.frames.push({label:(i===0?'Nowcast 0':'Nowcast '+i), layer:lyr});
     }
   }else{
-    document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
-  }
-
-  /* === Outfit & Activities === */
-  // find precip probs for next 1/3/6h
-  const future = correctedHours.filter(h => new Date(h.time) > nowAbs).slice(0,12);
-  const pop1 = future[0]?.pop ?? 0;
-  const pop3 = Math.max(...future.slice(0,3).map(h=>h.pop??0),0);
-  const pop6 = Math.max(...future.slice(0,6).map(h=>h.pop??0),0);
-  const adviceEl = document.getElementById('advicePanel');
-  const windowsScore = scoreWindowsDown(d.temp, d.dewpoint, d.wind, pop1);
-  const runScore = scoreRunOutside(d.temp, d.dewpoint, d.wind, pop3);
-  const openScore = scoreOpenWindows(d.temp, d.dewpoint, pop6);
-  adviceEl.innerHTML =
-    chip("What to Wear", "👕", 100, outfitAdvice(d.temp, d.dewpoint, d.wind))+
-    chip("Windows-Down Driving", "🚗", windowsScore, windowsScore>=80?"Perfect breeze":"We factor temp, humidity, wind, and near-term rain risk")+
-    chip("Run Outside", "🏃‍♀️", runScore, runScore>=80?"Dial up the miles":"Based on temp, dewpoint, wind, and 3-hour rain")+
-    chip("Open the Windows", "🪟", openScore, openScore>=80?"Air feels fresh":"We look for comfy dewpoints & low rain chances");
-
-  /* === Storm Lab build === */
-  buildStormLab(correctedHours, tz);
-}
-
-/* ========= Storm Lab ========= */
-function badge(label, val){
-  let cls='score-mid';
-  if(val>=70) cls='score-good';
-  else if(val<=40) cls='score-bad';
-  return `<span class="lab-badge ${cls}">${label}</span>`;
-}
-
-function buildStormLab(hours, tz){
-  const now = new Date();
-  const future = hours.filter(h => new Date(h.time) > now);
-  const next12 = future.slice(0,12);
-
-  // scores + timeline
-  const stormTL = document.getElementById('stormTimeline'); stormTL.innerHTML='';
-  let bestHour = null, bestScore = -1;
-
-  next12.forEach((h,idx)=>{
-    // previous 3 hours in series for trends
-    const thisT = new Date(h.time).getTime();
-    const prev3 = hours.filter(p => {
-      const pt = new Date(p.time).getTime();
-      return pt < thisT && pt >= thisT - 3*3600*1000;
-    });
-    const prevPres3 = prev3.filter(p=>p.pmsl!=null);
-
-    const s = nowcastScorePoint(h, prev3, prevPres3);
-    if(s>bestScore){ bestScore=s; bestHour=h; }
-
-    const el=document.createElement('div');
-    el.className='bucket';
-    el.innerHTML=`<strong>${fmtTime(h.time)}</strong>
-      <div class="tval" style="color:${s>=70?'#16a34a':s>=50?'#f59e0b':'#dc2626'}">${s}</div>
-      <div class="mini">${(h.pop??'–')}% pop • ${h.clouds??'–'}% cld</div>
-      <div class="mini" title="dewpoint / pressure">${h.dp}° dp • ${Math.round(h.pmsl??0)} hPa</div>`;
-    stormTL.appendChild(el);
-  });
-
-  // headline chips
-  const labScoreWrap = document.getElementById('labScoreWrap');
-  const bestTxt = bestHour ? `${new Date(bestHour.time).toLocaleTimeString('en-US',{hour:'numeric'})}` : '—';
-  const pressureTrend = (() => {
-    if(!bestHour) return 50;
-    const t = new Date(bestHour.time).getTime();
-    const prev3 = hours.filter(p => {
-      const pt = new Date(p.time).getTime();
-      return pt < t && pt >= t - 3*3600*1000 && p.pmsl!=null;
-    });
-    if(!prev3.length) return 50;
-    const prevP = prev3.reduce((a,b)=>a+b.pmsl,0)/prev3.length;
-    const fall = clamp(prevP - (bestHour.pmsl??prevP), -8, 8); // hPa fall
-    return clamp(Math.round(50 + fall*6), 0, 100);
-  })();
-
-  const dpTrendScore = (() => {
-    if(!bestHour) return 50;
-    const t = new Date(bestHour.time).getTime();
-    const prev3 = hours.filter(p => {
-      const pt = new Date(p.time).getTime();
-      return pt < t && pt >= t - 3*3600*1000;
-    });
-    if(!prev3.length) return 50;
-    const prevDp = prev3.reduce((a,b)=>a+b.dp,0)/prev3.length;
-    const rise = clamp(bestHour.dp - prevDp, -8, 8);
-    return clamp(Math.round(50 + rise*6), 0, 100);
-  })();
-
-  labScoreWrap.innerHTML =
-    chip("Rain ETA Guess", "⏱️", bestScore<0?0:bestScore, bestHour?`Peak signal around ${bestTxt}`:"No clear signal yet")+
-    chip("Pressure Falling", "📉", pressureTrend, "Falling pressure = rising chances")+
-    chip("Dewpoint Rising", "💧", dpTrendScore, "More moisture = more fuel");
-
-  // signals grid (current hour)
-  const labSignals = document.getElementById('labSignals'); labSignals.innerHTML='';
-  const cur = hours.find(h => new Date(h.time) >= new Date()) || hours[hours.length-1];
-  if(cur){
-    const capeLvl = cur.cape??0; const li = cur.li??2; const wdir = cur.wdir??0;
-    const items = [
-      {title:"CAPE", value: Math.round(capeLvl), hint:"Instability fuel (J/kg)", score: capeLvl>=800?85:capeLvl>=300?65:35},
-      {title:"Lifted Index", value: li.toFixed?.(1) ?? li, hint:"Negative = storm-friendly", score: li<=-2?85:li<=0?65:35},
-      {title:"Cloud Cover", value: `${cur.clouds??'–'}%`, hint:"Thickening cloud → developing weather", score: (cur.clouds??0)>=70?75:50},
-      {title:"Wind Dir", value: `${wdir}°`, hint:"Watch for wind shifts/convergence", score: 50},
-      {title:"Pressure", value: `${Math.round(cur.pmsl??0)} hPa`, hint:"Falling = trouble brewing", score: 50},
-      {title:"Dew Point", value: `${cur.dp}°F`, hint:"Rising = added moisture", score: 50},
-    ];
-    items.forEach(it=>{
-      const div=document.createElement('div');
-      div.className='lab-cell';
-      const lab = it.score>=70?'score-good':it.score<=40?'score-bad':'score-mid';
-      div.innerHTML = `<div style="font-weight:700">${it.title}</div>
-        <div style="font-size:1.1rem;margin:.25rem 0">${it.value}</div>
-        <div class="caption">${it.hint}</div>
-        <div class="lab-badge ${lab}" style="margin-top:.35rem">${it.score}</div>`;
-      labSignals.appendChild(div);
-    });
+    const lyr=iem();
+    Radar.frames.push({label:'Composite', layer:lyr});
   }
 }
 
-/* ========= Roulette ========= */
-function emojiDivIcon(char){ 
-  return L.divIcon({className:'', html:`<div class="emoji-pin">${char}</div>`, iconSize:[22,22], iconAnchor:[11,11]}); 
+function showRadarFrame(idx){
+  if(!Radar.frames.length) return;
+  Radar.idx = (idx + Radar.frames.length) % Radar.frames.length;
+  // remove all radar layers first
+  Radar.frames.forEach(f=>{ if(maps.radar.hasLayer(f.layer)) maps.radar.removeLayer(f.layer); });
+  // add selected
+  const f=Radar.frames[Radar.idx];
+  f.layer.setOpacity(Radar.opacity);
+  f.layer.addTo(maps.radar);
+  document.getElementById('radarTime').textContent = f.label;
 }
+
+function playRadar(){
+  if(Radar.playing || Radar.frames.length<=1) return;
+  Radar.playing = true;
+  document.getElementById('playPause').classList.add('active');
+  document.getElementById('playPause').textContent='⏸️ Pause';
+  Radar.timer = setInterval(()=> showRadarFrame(Radar.idx+1), 700);
+}
+function pauseRadar(){
+  Radar.playing=false;
+  document.getElementById('playPause').classList.remove('active');
+  document.getElementById('playPause').textContent='▶️ Play';
+  if(Radar.timer){ clearInterval(Radar.timer); Radar.timer=null; }
+}
+
+/* ----- Drawing ----- */
+function setInkColor(hex){ Radar.color = hex; }
+function togglePen(btn){
+  Radar.penMode = !Radar.penMode; Radar.arrowMode=false; Radar.arrowPts=[];
+  document.getElementById('arrowBtn').classList.remove('active');
+  btn.classList.toggle('active', Radar.penMode);
+}
+function toggleArrow(btn){
+  Radar.arrowMode = !Radar.arrowMode; Radar.penMode=false;
+  if(Radar.penActive){ maps.radar.removeLayer(Radar.penActive); Radar.penActive=null; }
+  document.getElementById('penBtn').classList.remove('active');
+  btn.classList.toggle('active', Radar.arrowMode);
+}
+
+function penStart(e){
+  if(!Radar.penMode) return;
+  maps.radar.dragging.disable();
+  const line=L.polyline([e.latlng],{color:Radar.color,weight:4,opacity:0.95});
+  line.addTo(Radar.drawings);
+  Radar.penActive=line;
+}
+function penMove(e){
+  if(Radar.penActive){ Radar.penActive.addLatLng(e.latlng); }
+}
+function penEnd(){
+  if(Radar.penActive){ Radar.penActive=null; }
+  maps.radar.dragging.enable();
+}
+
+function arrowClick(e){
+  if(!Radar.arrowMode) return;
+  Radar.arrowPts.push(e.latlng);
+  if(Radar.arrowPts.length===2){
+    const line=L.polyline(Radar.arrowPts,{color:Radar.color,weight:4,opacity:0.95});
+    line.addTo(Radar.drawings);
+    // add arrowhead
+    L.polylineDecorator(line, {
+      patterns: [{offset: '100%', repeat: 0, symbol: L.Symbol.arrowHead({pixelSize:14, polygon:false, pathOptions:{stroke:true,color:Radar.color,weight:4}})}]
+    }).addTo(Radar.drawings);
+    Radar.arrowPts=[];
+  }
+}
+
+function undoDrawing(){
+  const layers=Radar.drawings.getLayers();
+  if(layers.length){
+    const last=layers[layers.length-1];
+    Radar.drawings.removeLayer(last);
+  }
+}
+function clearDrawing(){ Radar.drawings.clearLayers(); }
+
+/* ========================= Weather Roulette (unchanged) ========================= */
+function emojiDivIcon(char){ return L.divIcon({className:'', html:`<div class="emoji-pin">${char}</div>`, iconSize:[22,22], iconAnchor:[11,11]}); }
 
 async function roulette(lat, lon){
   document.getElementById('rouletteResults').innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
-
   const clicked = await weather.get(lat, lon,{bulk:false});
-  const fc = await weather.hourly(lat, lon);
-  // bias-correct dp like local
-  const biasRaw = (fc.omCurrentDp!=null && Number.isFinite(clicked.dewpoint)) ? (clicked.dewpoint - fc.omCurrentDp) : 0;
-  const bias = clamp(biasRaw, -8, 8);
-  const hours = (fc.hours||[]).map((h,idx)=>{
-    const factor = idx<18 ? 1 : idx<48 ? 0.6 : 0.3;
-    return {...h, dp: Math.round(clamp(h.dp + bias*factor, -40, 85))};
-  });
-
-  // simple Rain ETA: first future hour with nowcast score >= 70
-  const now = new Date();
-  const future = hours.filter(h=>new Date(h.time)>now).slice(0,18);
-  let etaText = "No strong signal";
-  for(let i=0;i<future.length;i++){
-    const h = future[i];
-    const thisT = new Date(h.time).getTime();
-    const prev3 = hours.filter(p=>{const pt=new Date(p.time).getTime();return pt<thisT && pt>=thisT-3*3600*1000;});
-    const prevP = prev3.filter(p=>p.pmsl!=null);
-    const s = nowcastScorePoint(h, prev3, prevP);
-    if(s>=70){ etaText = `Rain likely around ${fmtTime(h.time)} (score ${s})`; break; }
-  }
-
-  // US-only search for opposite
   let maxDiff=-1, opposite=null;
   for(let tLat=26;tLat<=48;tLat+=5){
     for(let tLon=-124;tLon<=-67;tLon+=6){
@@ -823,120 +516,128 @@ async function roulette(lat, lon){
       }catch{}
     }
   }
-
-  // Random wildcard in US
   let wildcard=null, tries=0;
   while(tries<30 && !wildcard){
-    const wLat = 26 + Math.random()*22;
-    const wLon = -124 + Math.random()*57;
+    const wLat=26+Math.random()*22, wLon=-124+Math.random()*57;
     if(approxUSLower48(wLat,wLon)){
-      try{ const w=await weather.get(wLat,wLon,{bulk:true}); wildcard={lat:wLat,lon:wLon,weather:w}; }catch{}
+      try{ wildcard={lat:wLat,lon:wLon,weather:await weather.get(wLat,wLon,{bulk:true})}; }catch{}
     }
     tries++;
   }
 
-  const hereName = await nameIfUSLand(lat,lon,true) || `${lat.toFixed(1)}°, ${Math.abs(lon).toFixed(1)}°W`;
-  const oppName = opposite ? (await nameIfUSLand(opposite.lat, opposite.lon, true) || `${opposite.lat.toFixed(1)}°, ${Math.abs(opposite.lon).toFixed(1)}°W`) : '—';
-  const wildName = wildcard ? (await nameIfUSLand(wildcard.lat, wildcard.lon, true) || `${wildcard.lat.toFixed(1)}°, ${Math.abs(wildcard.lon).toFixed(1)}°W`) : '—';
+  const hereName=`${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+  const oppName=opposite?`${opposite.lat.toFixed(2)}, ${opposite.lon.toFixed(2)}`:'—';
+  const wildName=wildcard?`${wildcard.lat.toFixed(2)}, ${wildcard.lon.toFixed(2)}`:'—';
 
   if(rouletteLayer){ rouletteLayer.clearLayers(); } else { rouletteLayer=L.layerGroup().addTo(maps.roulette); }
-  const youM = L.marker([lat,lon],{icon:emojiDivIcon('🎯')}).bindPopup(`<strong>${hereName}</strong><br>${clicked.temp}°F • dew ${clicked.dewpoint}°<br><em>${etaText}</em>`).addTo(rouletteLayer);
+  const youM=L.marker([lat,lon],{icon:emojiDivIcon('🎯')}).bindPopup(`<strong>${hereName}</strong><br>${clicked.temp}°F • dew ${clicked.dewpoint}°`).addTo(rouletteLayer);
   let oppM,wildM;
+  if(opposite){ const em=(opposite.weather.temp<clicked.temp)?'🧊':'🔥';
+    oppM=L.marker([opposite.lat,opposite.lon],{icon:emojiDivIcon(em)}).bindPopup(`<strong>${oppName}</strong><br>${opposite.weather.temp}°F • dew ${opposite.weather.dewpoint}°`).addTo(rouletteLayer); }
+  if(wildcard){ wildM=L.marker([wildcard.lat,wildcard.lon],{icon:emojiDivIcon('🎲')}).bindPopup(`<strong>${wildName}</strong><br>${wildcard.weather.temp}°F • dew ${wildcard.weather.dewpoint}°`).addTo(rouletteLayer); }
 
-  if(opposite){
-    const isColder = opposite.weather.temp < clicked.temp;
-    const em = isColder ? '🧊' : '🔥';
-    oppM = L.marker([opposite.lat,opposite.lon],{icon:emojiDivIcon(em)})
-      .bindPopup(`<strong>${oppName}</strong><br>${opposite.weather.temp}°F • dew ${opposite.weather.dewpoint}°`).addTo(rouletteLayer);
-  }
-  if(wildcard){
-    wildM = L.marker([wildcard.lat,wildcard.lon],{icon:emojiDivIcon('🎲')})
-      .bindPopup(`<strong>${wildName}</strong><br>${wildcard.weather.temp}°F • dew ${wildcard.weather.dewpoint}°`).addTo(rouletteLayer);
-  }
-
-  const bounds = L.latLngBounds([]);
-  [youM, oppM, wildM].forEach(m=>{ if(m) bounds.extend(m.getLatLng()); });
+  const bounds=L.latLngBounds([]); [youM,oppM,wildM].forEach(m=>{ if(m) bounds.extend(m.getLatLng()); });
   if(bounds.isValid()) maps.roulette.fitBounds(bounds.pad(0.2));
 
-  const diffT = opposite ? Math.abs(clicked.temp - opposite.weather.temp) : 0;
-  const diffD = opposite ? Math.abs(clicked.dewpoint - opposite.weather.dewpoint) : 0;
+  const diffT=opposite?Math.abs(clicked.temp-opposite.weather.temp):0;
+  const diffD=opposite?Math.abs(clicked.dewpoint-opposite.weather.dewpoint):0;
   document.getElementById('rouletteResults').innerHTML = `
     <h3>📍 Your Click: ${hereName}</h3>
-    <div class="twin-card"><div>${clicked.temp}°F / ${clicked.dewpoint}° dew / ${clicked.pressure} hPa</div><div class="caption">${etaText}</div></div>
+    <div class="twin-card"><div>${clicked.temp}°F / ${clicked.dewpoint}° dew / ${clicked.pressure} hPa</div></div>
     <h3>🔄 Weather Opposite: ${oppName}</h3>
     <div class="twin-card"><div>${opposite ? `${opposite.weather.temp}°F / ${opposite.weather.dewpoint}° dew / ${opposite.weather.pressure} hPa` : '—'}</div>
     <div style="color: var(--amber); font-weight: bold;">${opposite ? `${diffT+diffD}° different!` : ''}</div></div>
     <h3>🎲 Wildcard: ${wildName}</h3>
-    <div class="twin-card"><div>${wildcard ? `${wildcard.weather.temp}°F / ${wildcard.weather.dewpoint}° dew / ${wildcard.weather.pressure} hPa` : '—'}</div></div>
-  `;
+    <div class="twin-card"><div>${wildcard ? `${wildcard.weather.temp}°F / ${wildcard.weather.dewpoint}° dew / ${wildcard.weather.pressure} hPa` : '—'}</div></div>`;
 }
 
-/* ========= Maps ========= */
-function initMaps() {
-  // Local map
-  maps.local = L.map('localMap').setView([userLocation.lat, userLocation.lon], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap contributors'}).addTo(maps.local);
-  const localMarker = L.marker([userLocation.lat, userLocation.lon]).addTo(maps.local);
-  maps.local.on('click', async (e) => {
-    userLocation = {lat: e.latlng.lat, lon: e.latlng.lng};
-    localMarker.setLatLng(e.latlng);
-    document.getElementById('locationInput').value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
-    await updateLocal();
-  });
+/* ========================= Maps & UI wiring ========================= */
+function initMaps(){
+  // Local
+  maps.local=L.map('localMap').setView([userLocation.lat,userLocation.lon],8);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.local);
+  const localMarker=L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
+  maps.local.on('click', async (e)=>{ userLocation={lat:e.latlng.lat,lon:e.latlng.lng}; localMarker.setLatLng(e.latlng);
+    document.getElementById('locationInput').value=`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`; await updateLocal(); });
 
-  // Roulette map
-  maps.roulette = L.map('rouletteMap').setView([39, -98], 4);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap contributors'}).addTo(maps.roulette);
-  maps.roulette.on('click', (e) => roulette(e.latlng.lat, e.latlng.lng));
+  // Storm Lab radar
+  maps.radar=L.map('radarMap').setView([userLocation.lat,userLocation.lon],6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.radar);
+  Radar.drawings=L.featureGroup().addTo(maps.radar);
+
+  // Pen events
+  maps.radar.on('mousedown',penStart);
+  maps.radar.on('mousemove',penMove);
+  window.addEventListener('mouseup',penEnd);
+  maps.radar.on('click',arrowClick);
+
+  // Roulette
+  maps.roulette=L.map('rouletteMap').setView([39,-98],4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.roulette);
+  maps.roulette.on('click',(e)=>roulette(e.latlng.lat,e.latlng.lng));
 }
 
-/* ========= Tabs ========= */
-window.switchTab = function(evt, tab){
+function wireStormLabControls(){
+  document.getElementById('prevFrame').onclick=()=>{ pauseRadar(); showRadarFrame(Radar.idx-1); };
+  document.getElementById('nextFrame').onclick=()=>{ pauseRadar(); showRadarFrame(Radar.idx+1); };
+  document.getElementById('playPause').onclick=()=>{ Radar.playing?pauseRadar():playRadar(); };
+  document.getElementById('radarOpacity').oninput=(e)=>{ Radar.opacity=(+e.target.value)/100; if(Radar.frames[Radar.idx]) Radar.frames[Radar.idx].layer.setOpacity(Radar.opacity); };
+  document.getElementById('penBtn').onclick=(e)=>togglePen(e.target);
+  document.getElementById('arrowBtn').onclick=(e)=>toggleArrow(e.target);
+  document.getElementById('inkColor').oninput=(e)=>setInkColor(e.target.value);
+  document.getElementById('undoBtn').onclick=undoDrawing;
+  document.getElementById('clearBtn').onclick=clearDrawing;
+}
+
+/* Tabs */
+window.switchTab=function(evt,tab){
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
   evt.target.classList.add('active');
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById(tab).classList.add('active');
-  setTimeout(()=>{ if(maps[tab]) maps[tab].invalidateSize(); }, 100);
-}
+  setTimeout(()=>{ if(maps[tab]) maps[tab].invalidateSize(); },120);
+};
 
-/* ========= Set location from input ========= */
-window.setLocation = async function(){
-  const input = document.getElementById('locationInput').value;
-  const coords = input.split(',').map(s => parseFloat(s.trim()));
-  if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-    userLocation = {lat: coords[0], lon: coords[1]};
-    if (maps.local) {
-      maps.local.setView([userLocation.lat, userLocation.lon], 8);
-      maps.local.eachLayer((layer) => {
-        if (layer instanceof L.Marker) layer.setLatLng([userLocation.lat, userLocation.lon]);
-      });
+/* Location setter */
+window.setLocation=async function(){
+  const v=document.getElementById('locationInput').value; const c=v.split(',').map(s=>parseFloat(s.trim()));
+  if(c.length===2 && !isNaN(c[0]) && !isNaN(c[1])){
+    userLocation={lat:c[0],lon:c[1]};
+    if(maps.local){
+      maps.local.setView([userLocation.lat,userLocation.lon],8);
+      maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
     }
+    if(maps.radar){ maps.radar.setView([userLocation.lat,userLocation.lon],6); }
     await updateLocal();
-  } else {
-    alert('Please enter coordinates as: latitude, longitude (e.g., 33.0318, -79.7287)');
-  }
-}
+  }else alert('Use: latitude, longitude   e.g., 40.7128, -74.0060');
+};
 
-/* ========= Geolocation (optional) ========= */
-function getUserLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(async (pos)=>{
-      userLocation={lat:pos.coords.latitude, lon:pos.coords.longitude};
-      document.getElementById('locationInput').value = `${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+/* Geolocate (optional) */
+function getUserLocation(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      userLocation={lat:pos.coords.latitude,lon:pos.coords.longitude};
+      document.getElementById('locationInput').value=`${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
       if(maps.local){
-        maps.local.setView([userLocation.lat, userLocation.lon], 8);
-        maps.local.eachLayer((layer)=>{ if(layer instanceof L.Marker) layer.setLatLng([userLocation.lat, userLocation.lon]); });
+        maps.local.setView([userLocation.lat,userLocation.lon],8);
+        maps.local.eachLayer(l=>{ if(l instanceof L.Marker) l.setLatLng([userLocation.lat,userLocation.lon]); });
       }
+      if(maps.radar){ maps.radar.setView([userLocation.lat,userLocation.lon],6); }
       await updateLocal();
-    }, ()=>{/* user denied → keep default */});
+    }, ()=>{});
   }
 }
 
-/* ========= Init ========= */
+/* Init */
 window.addEventListener('DOMContentLoaded', async ()=>{
   initMaps();
+  wireStormLabControls();
   getUserLocation();
   await updateLocal();
+
+  // Build radar frames after map is live
+  await buildRadarLayers();
+  showRadarFrame(0); // start at first frame
 });
 </script>
 </body>
