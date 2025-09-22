@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dummy - Weather's Weird Side</title>
 
-  <!-- Favicon -->
   <link rel="icon" href="dummy_logo.png"/>
 
   <!-- Leaflet -->
@@ -25,18 +24,22 @@
     h1{font-size:1.5rem;font-weight:900;color:var(--red);letter-spacing:-.02em}
     .location-control{display:flex;gap:.5rem;align-items:center;background:var(--gray);padding:.5rem 1rem;border-radius:999px}
     .location-control input{border:none;background:none;outline:none;width:220px}
+
     .tabs{display:flex;background:var(--card);padding:.5rem;gap:.5rem}
     .tab{padding:.75rem 1.5rem;border:0;background:transparent;font-weight:700;cursor:pointer;border-radius:.5rem;transition:.2s}
     .tab:hover{background:var(--gray)}
     .tab.active{background:var(--red);color:#fff}
+
     .content{max-width:1200px;margin:0 auto;padding:1rem}
     .section{display:none}
     .section.active{display:block}
+
     .card{background:var(--card);border-radius:1rem;padding:1.5rem;margin:1rem 0;box-shadow:0 4px 20px rgba(0,0,0,.08)}
     .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin:1.25rem 0}
     .metric{text-align:center;padding:1rem;background:#f1f5f9;border-radius:.75rem}
     .metric-value{font-size:2rem;font-weight:900;color:var(--red)}
     .metric-label{font-size:.75rem;text-transform:uppercase;color:var(--muted);margin-top:.25rem;display:flex;gap:.35rem;justify-content:center;align-items:center}
+
     .help{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#e5e7eb;color:#334155;font-weight:900;font-size:.7rem;cursor:help;line-height:18px;position:relative}
     .help:hover{background:#e2e8f0}
     .help:focus{outline:2px solid #cbd5e1}
@@ -44,25 +47,35 @@
     .help[data-tip]::before{content:"";position:absolute;bottom:118%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--tooltip);opacity:0;transition:opacity .15s;z-index:19}
     .help[data-tip]:hover::after,.help[data-tip]:focus::after{opacity:1;transform:translateX(-50%) translateY(0)}
     .help[data-tip]:hover::before,.help[data-tip]:focus::before{opacity:1}
+
     .map{height:500px;border-radius:1rem;overflow:hidden;margin:1rem 0;position:relative}
     .insight{background:linear-gradient(90deg,rgba(59,130,246,.1),transparent);border-left:3px solid var(--blue);padding:1rem;margin:1rem 0;border-radius:0 .5rem .5rem 0}
     .data-age{position:absolute;top:1rem;right:1rem;padding:.25rem .75rem;background:rgba(255,255,255,.9);border-radius:999px;font-size:.75rem;color:var(--muted)}
+
     .timeline{display:flex;gap:.5rem;overflow:auto;padding:.25rem 0 .5rem}
     .bucket{min-width:86px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;padding:.5rem;text-align:center}
     .bucket strong{display:block;font-size:.9rem}
     .bucket .tval{font-size:1.2rem;font-weight:900;color:var(--red)}
     .bucket .mini{font-size:.7rem;color:#64748b}
+
     .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
     .chip{padding:.35rem .6rem;border-radius:999px;font-size:.8rem;background:#eef2ff;color:#3730a3;border:1px solid #e0e7ff}
     .chip.bad{background:#fee2e2;color:#991b1b;border-color:#fecaca}
     .chip.ok{background:#fef9c3;color:#854d0e;border-color:#fde68a}
     .chip.good{background:#dcfce7;color:#065f46;border-color:#bbf7d0}
+
     /* Storm Lab controls */
     .controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
-    .controls button,.controls input[type="range"]{margin:.25rem 0}
     .controls .label{font-size:.85rem;color:var(--muted)}
-    /* Drawing canvas sits on top of tiles */
-    #stormDrawCanvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:500;pointer-events:none}
+
+    /* Drawing canvas sits on top of radar */
+    #stormDrawCanvas{
+      position:absolute;top:0;left:0;width:100%;height:100%;
+      z-index:500;pointer-events:none; /* toggled on when drawing */
+      touch-action:none; /* stop browser gestures while drawing */
+    }
+
+    /* Emoji pins */
     .emoji-pin{font-size:22px;line-height:22px;text-align:center;transform:translate(-50%,-50%);filter:drop-shadow(0 1px 2px rgba(0,0,0,.25))}
   </style>
 </head>
@@ -159,10 +172,10 @@
 </div>
 
 <script>
-/* ------------ small US place set (offline fallback for names) ------------ */
+/* ======= small US place set (offline fallback for names) ======= */
 const US_PLACES=[{n:"New York, NY",lat:40.7128,lon:-74.0060},{n:"Los Angeles, CA",lat:34.0522,lon:-118.2437},{n:"Chicago, IL",lat:41.8781,lon:-87.6298},{n:"Houston, TX",lat:29.7604,lon:-95.3698},{n:"Phoenix, AZ",lat:33.4484,lon:-112.0740},{n:"Philadelphia, PA",lat:39.9526,lon:-75.1652},{n:"San Antonio, TX",lat:29.4241,lon:-98.4936},{n:"San Diego, CA",lat:32.7157,lon:-117.1611},{n:"Dallas, TX",lat:32.7767,lon:-96.7970},{n:"San Jose, CA",lat:37.3382,lon:-121.8863},{n:"Austin, TX",lat:30.2672,lon:-97.7431},{n:"Jacksonville, FL",lat:30.3322,lon:-81.6557},{n:"San Francisco, CA",lat:37.7749,lon:-122.4194},{n:"Columbus, OH",lat:39.9612,lon:-82.9988},{n:"Charlotte, NC",lat:35.2271,lon:-80.8431},{n:"Indianapolis, IN",lat:39.7684,lon:-86.1581},{n:"Fort Worth, TX",lat:32.7555,lon:-97.3308},{n:"Seattle, WA",lat:47.6062,lon:-122.3321},{n:"Denver, CO",lat:39.7392,lon:-104.9903},{n:"Washington, DC",lat:38.9072,lon:-77.0369},{n:"Boston, MA",lat:42.3601,lon:-71.0589},{n:"Nashville, TN",lat:36.1627,lon:-86.7816},{n:"Portland, OR",lat:45.5152,lon:-122.6784},{n:"Oklahoma City, OK",lat:35.4676,lon:-97.5164},{n:"Las Vegas, NV",lat:36.1699,lon:-115.1398},{n:"Albuquerque, NM",lat:35.0844,lon:-106.6504},{n:"Atlanta, GA",lat:33.7490,lon:-84.3880},{n:"Miami, FL",lat:25.7617,lon:-80.1918},{n:"Tampa, FL",lat:27.9506,lon:-82.4572},{n:"Orlando, FL",lat:28.5383,lon:-81.3792},{n:"Kansas City, MO",lat:39.0997,lon:-94.5786},{n:"Minneapolis, MN",lat:44.9778,lon:-93.2650},{n:"St. Louis, MO",lat:38.6270,lon:-90.1994},{n:"Cincinnati, OH",lat:39.1031,lon:-84.5120},{n:"Cleveland, OH",lat:41.4993,lon:-81.6944},{n:"Pittsburgh, PA",lat:40.4406,lon:-79.9959},{n:"Buffalo, NY",lat:42.8864,lon:-78.8784},{n:"Raleigh, NC",lat:35.7796,lon:-78.6382},{n:"Richmond, VA",lat:37.5407,lon:-77.4360},{n:"Charleston, SC",lat:32.7765,lon:-79.9311},{n:"Columbia, SC",lat:34.0007,lon:-81.0348},{n:"Greenville, SC",lat:34.8526,lon:-82.3940},{n:"Savannah, GA",lat:32.0809,lon:-81.0912},{n:"Birmingham, AL",lat:33.5186,lon:-86.8104},{n:"New Orleans, LA",lat:29.9511,lon:-90.0715},{n:"Memphis, TN",lat:35.1495,lon:-90.0490},{n:"Louisville, KY",lat:38.2527,lon:-85.7585},{n:"Detroit, MI",lat:42.3314,lon:-83.0458},{n:"Milwaukee, WI",lat:43.0389,lon:-87.9065},{n:"Madison, WI",lat:43.0722,lon:-89.4008},{n:"Des Moines, IA",lat:41.5868,lon:-93.6250},{n:"Omaha, NE",lat:41.2565,lon:-95.9345},{n:"Boise, ID",lat:43.6150,lon:-116.2023},{n:"Salt Lake City, UT",lat:40.7608,lon:-111.8910},{n:"Phoenix, AZ",lat:33.4484,lon:-112.0740},{n:"Tucson, AZ",lat:32.2226,lon:-110.9747},{n:"El Paso, TX",lat:31.7619,lon:-106.4850},{n:"Honolulu, HI",lat:21.3099,lon:-157.8581},{n:"Anchorage, AK",lat:61.2181,lon:-149.9003},{n:"Fargo, ND",lat:46.8772,lon:-96.7898},{n:"Sioux Falls, SD",lat:43.5446,lon:-96.7311},{n:"Billings, MT",lat:45.7833,lon:-108.5007},{n:"Missoula, MT",lat:46.8721,lon:-113.9940},{n:"Spokane, WA",lat:47.6588,lon:-117.4260},{n:"Eugene, OR",lat:44.0521,lon:-123.0868},{n:"Fresno, CA",lat:36.7378,lon:-119.7871},{n:"Bakersfield, CA",lat:35.3733,lon:-119.0187},{n:"Sacramento, CA",lat:38.5816,lon:-121.4944},{n:"San Luis Obispo, CA",lat:35.2828,lon:-120.6596},{n:"Reno, NV",lat:39.5296,lon:-119.8138},{n:"Flagstaff, AZ",lat:35.1983,lon:-111.6513},{n:"Santa Fe, NM",lat:35.6870,lon:-105.9378},{n:"Lubbock, TX",lat:33.5779,lon:-101.8552},{n:"Amarillo, TX",lat:35.2219,lon:-101.8313},{n:"Tulsa, OK",lat:36.1539,lon:-95.9928},{n:"Little Rock, AR",lat:34.7465,lon:-92.2896},{n:"Knoxville, TN",lat:35.9606,lon:-83.9207},{n:"Baton Rouge, LA",lat:30.4515,lon:-91.1871},{n:"Mobile, AL",lat:30.6954,lon:-88.0399},{n:"Pensacola, FL",lat:30.4213,lon:-87.2169},{n:"Jackson, MS",lat:32.2988,lon:-90.1848},{n:"Chattanooga, TN",lat:35.0456,lon:-85.3097},{n:"Asheville, NC",lat:35.5951,lon:-82.5515},{n:"Greensboro, NC",lat:36.0726,lon:-79.7920},{n:"Virginia Beach, VA",lat:36.8529,lon:-75.9780},{n:"Norfolk, VA",lat:36.8508,lon:-76.2859},{n:"Richmond, VA",lat:37.5407,lon:-77.4360},{n:"Harrisburg, PA",lat:40.2732,lon:-76.8867},{n:"Albany, NY",lat:42.6526,lon:-73.7562},{n:"Syracuse, NY",lat:43.0481,lon:-76.1474},{n:"Rochester, NY",lat:43.1566,lon:-77.6088},{n:"Burlington, VT",lat:44.4759,lon:-73.2121},{n:"Manchester, NH",lat:42.9956,lon:-71.4548},{n:"Portland, ME",lat:43.6591,lon:-70.2568},{n:"Providence, RI",lat:41.8240,lon:-71.4128},{n:"Hartford, CT",lat:41.7658,lon:-72.6734},{n:"New Haven, CT",lat:41.3083,lon:-72.9279},{n:"Newark, NJ",lat:40.7357,lon:-74.1724},{n:"Jersey City, NJ",lat:40.7178,lon:-74.0431},{n:"Huger, SC",lat:33.0318,lon:-79.7287}];
 
-/* ------------ helpers ------------ */
+/* ======= helpers ======= */
 const R2D=Math.PI/180;
 function hav(a,b){const R=6371;const dLat=(b.lat-a.lat)*R2D;const dLon=(b.lon-a.lon)*R2D;const la1=a.lat*R2D;const la2=b.lat*R2D;const s1=Math.sin(dLat/2),s2=Math.sin(dLon/2);const c=2*Math.asin(Math.sqrt(s1*s1+Math.cos(la1)*Math.cos(la2)*s2*s2));return R*c;}
 function nearestUSPlace(lat,lon){let best=null,bestD=1e9,pt={lat,lon};for(const p of US_PLACES){const d=hav(pt,{lat:p.lat,lon:p.lon});if(d<bestD){bestD=d;best=p;}}return (bestD<=120)?best.n:null;}
@@ -171,7 +184,7 @@ const geocodeCache=new Map();let geocodeQueue=Promise.resolve();
 async function nameIfUSLand(lat,lon,includeState=false){const offline=nearestUSPlace(lat,lon);if(offline)return offline;const key=`${lat.toFixed(3)},${lon.toFixed(3)}_${includeState}`;if(geocodeCache.has(key))return geocodeCache.get(key);return geocodeQueue=geocodeQueue.then(async()=>{await new Promise(r=>setTimeout(r,150));try{const url=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=12&addressdetails=1&accept-language=en&countrycodes=us`;const r=await fetch(url);if(!r.ok){geocodeCache.set(key,null);return null;}const j=await r.json();const a=j.address||{};const waterWords=['Ocean','Gulf','Bay','Sound','Sea','Lagoon'];if(waterWords.some(w=>j.display_name?.includes(w))){geocodeCache.set(key,null);return null;}let label=(a.city||a.town||a.village||a.hamlet||a.county||'').toString();if(!label&&a.state)label=a.state;if(!label){geocodeCache.set(key,null);return null;}if(includeState&&a.state)label=`${label}, ${a.state}`;geocodeCache.set(key,label);return label;}catch{geocodeCache.set(key,null);return null;}});}
 async function fetchJSON(url,timeoutMs=10000){const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort('timeout'),timeoutMs);try{const resp=await fetch(url,{signal:ctrl.signal});if(!resp.ok)throw new Error(`HTTP ${resp.status}`);return await resp.json();}finally{clearTimeout(t);}}
 
-/* ------------ thermo ------------ */
+/* ======= thermo ======= */
 function dewpointFromTRH(tF,rh){const tC=(tF-32)*5/9;const a=17.625,b=243.04;const gamma=Math.log(Math.max(1e-6,rh/100))+(a*tC)/(b+tC);const dpC=(b*gamma)/(a-gamma);return dpC*9/5+32;}
 function wetBulb(tF,rh){const C=(tF-32)*5/9;const wb=C*Math.atan(0.151977*Math.sqrt((rh??50)+8.313659))+Math.atan(C+(rh??50))-Math.atan((rh??50)-1.676331)+0.00391838*Math.pow((rh??50),1.5)*Math.atan(0.023101*(rh??50))-4.686035;return Math.round(wb*9/5+32);}
 function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237.3));const avp=svp*(rh??50)/100;return (svp-avp).toFixed(2);}
@@ -180,7 +193,7 @@ const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 const dateKeyInTz=(iso,tz)=>new Date(iso).toLocaleDateString('en-CA',{timeZone:tz});
 const todayKeyInTz=(tz)=>new Date().toLocaleDateString('en-CA',{timeZone:tz});
 
-/* ------------ weather service ------------ */
+/* ======= weather service ======= */
 class Weather{
   constructor(){this.cache=new Map();this.CACHE=5*60*1000;}
   async get(lat,lon,opts={bulk:false}){
@@ -231,11 +244,11 @@ class Weather{
 }
 const weather=new Weather();
 
-/* ------------ state & maps ------------ */
+/* ======= state & maps ======= */
 let userLocation={lat:40.7128,lon:-74.0060};
 let maps={};let rouletteLayer=null;
 
-/* ------------ Your Weather ------------ */
+/* ======= Your Weather ======= */
 async function updateLocal(){
   const d=await weather.get(userLocation.lat,userLocation.lon,{bulk:false});
   document.getElementById('temp').textContent=`${d.temp}°`;
@@ -256,6 +269,7 @@ async function updateLocal(){
   const risks=surfaces.filter(s=>s.temp<=d.dewpoint).map(s=>s.name);
   document.getElementById('condensationRisk').innerHTML=risks.length?`⚠️ <strong>Condensation likely on:</strong> ${risks.join(', ')}`:`✓ <strong>No condensation risk</strong> — all surfaces above dew point`;
 
+  // hourly model + bias to current Td
   let fc;try{fc=await weather.hourly(userLocation.lat,userLocation.lon);}catch{fc={hours:[],omCurrentDp:null,tz:'UTC'};}
   const biasRaw=(fc.omCurrentDp!=null&&Number.isFinite(d.dewpoint))?(d.dewpoint-fc.omCurrentDp):0;
   const bias=clamp(biasRaw,-8,8);
@@ -329,7 +343,6 @@ async function updateLocal(){
     }else document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
   }else document.getElementById('firepitHint').textContent='Fire-pit check: evening data not available yet.';
 
-  // Outcomes
   renderOutcomes(d, correctedHours);
 }
 
@@ -351,9 +364,9 @@ function renderOutcomes(curr, hours){
   else if((curr.temp<45||curr.temp>75)||curr.dewpoint>65) runState='ok';
   else runState='good';
   oc.appendChild(chip(`Run outside: ${runState==='good'?'Go for it':runState==='ok'?'Okay':'Skip'}`, runState));
-  // What to wear
-  const wear = suggestClothes(curr.temp, curr.dewpoint, maxWind, avgClouds);
-  oc.appendChild(chip(`Wear: ${wear}`, 'ok'));
+  // Wear
+  const wear=suggestClothes(curr.temp,curr.dewpoint,maxWind,avgClouds);
+  oc.appendChild(chip(`Wear: ${wear}`,'ok'));
 }
 function chip(text,kind){const s=document.createElement('span');s.className=`chip ${kind}`;s.textContent=text;return s;}
 function suggestClothes(t,dp,wind,cloud){
@@ -366,62 +379,53 @@ function suggestClothes(t,dp,wind,cloud){
   return 'Minimal & shade; avoid peak heat';
 }
 
-/* ------------ Storm Lab: radar + telestrator ------------ */
-const radarState={frames:[],index:0,playing:false,timer:null,opacity:0.8,layers:[],host:''};
+/* ======= Storm Lab: radar + telestrator ======= */
+const radarState={frames:[],index:0,playing:false,timer:null,opacity:0.8,layers:[]};
 
 async function loadRadarFrames(){
   try{
     const meta=await fetchJSON('https://api.rainviewer.com/public/weather-maps.json',10000);
-    radarState.host = (meta.host||'https://tilecache.rainviewer.com');
     const frames=[...(meta.radar?.past||[]),...(meta.radar?.nowcast||[])];
     radarState.frames=frames;
-    // build layers (lazy: create on first use)
-    setRadarFrame(frames.length-1,true);
-    document.getElementById('radarTime').textContent = formatRadarTime(frames[frames.length-1]?.time);
-  }catch(e){
-    document.getElementById('radarTime').textContent='Radar unavailable';
-  }
+    if(frames.length){setRadarFrame(frames.length-1); document.getElementById('radarTime').textContent=timeLabel(frames.at(-1).time);}
+  }catch{document.getElementById('radarTime').textContent='Radar unavailable';}
+}
+function radarUrlForTime(ts){
+  // RainViewer v2 radar tile template
+  return `https://tilecache.rainviewer.com/v2/radar/${ts}/256/{z}/{x}/{y}/2/1_1.png`;
 }
 function layerForIndex(idx){
   if(!radarState.frames[idx]) return null;
   if(radarState.layers[idx]) return radarState.layers[idx];
-  const path=radarState.frames[idx].path; const url=radarState.host+path;
+  const url=radarUrlForTime(radarState.frames[idx].time);
   const lyr=L.tileLayer(url,{opacity:0,zIndex:400,attribution:'RainViewer'});
   radarState.layers[idx]=lyr; lyr.addTo(maps.storm);
   return lyr;
 }
-function setRadarFrame(idx,immediate=false){
+function setRadarFrame(idx){
   if(!radarState.frames.length) return;
-  idx = (idx+radarState.frames.length)%radarState.frames.length;
+  idx=(idx+radarState.frames.length)%radarState.frames.length;
   // hide current
   const cur=layerForIndex(radarState.index); if(cur) cur.setOpacity(0);
   // show new
-  radarState.index=idx;
-  const lyr=layerForIndex(idx);
-  if(lyr) lyr.setOpacity(radarState.opacity);
-  document.getElementById('radarTime').textContent = formatRadarTime(radarState.frames[idx]?.time);
+  radarState.index=idx; const lyr=layerForIndex(idx); if(lyr) lyr.setOpacity(radarState.opacity);
+  document.getElementById('radarTime').textContent=timeLabel(radarState.frames[idx].time);
 }
 function playRadar(){
-  if(radarState.playing || !radarState.frames.length) return;
-  radarState.playing=true;
-  document.getElementById('radarPlay').disabled=true;
-  document.getElementById('radarPause').disabled=false;
-  radarState.timer=setInterval(()=>setRadarFrame(radarState.index+1),500);
+  if(radarState.playing||!radarState.frames.length) return;
+  radarState.playing=true; document.getElementById('radarPlay').disabled=true; document.getElementById('radarPause').disabled=false;
+  radarState.timer=setInterval(()=>setRadarFrame(radarState.index+1),600);
 }
 function pauseRadar(){
-  radarState.playing=false;
-  document.getElementById('radarPlay').disabled=false;
-  document.getElementById('radarPause').disabled=true;
-  if(radarState.timer){clearInterval(radarState.timer);radarState.timer=null;}
+  radarState.playing=false; document.getElementById('radarPlay').disabled=false; document.getElementById('radarPause').disabled=true;
+  if(radarState.timer){clearInterval(radarState.timer); radarState.timer=null;}
 }
-function formatRadarTime(ts){
-  if(!ts) return '—';
-  const d=new Date(ts*1000);
-  return d.toLocaleString([], {hour:'2-digit',minute:'2-digit'});
-}
+function timeLabel(ts){const d=new Date(ts*1000);return d.toLocaleString([], {hour:'2-digit',minute:'2-digit'});}
 
-/* telestrator */
+/* telestrator with map-lock while drawing */
 let drawActive=false, isDrawing=false, drawCtx=null, lastPt=null;
+let prevInteract={drag:true,scroll:true,touch:true,double:true,box:true,kbd:true,tap:true};
+
 function setupDrawCanvas(){
   const cvs=document.getElementById('stormDrawCanvas');
   const mapDiv=document.getElementById('stormMap');
@@ -429,11 +433,15 @@ function setupDrawCanvas(){
   resize(); new ResizeObserver(resize).observe(mapDiv);
   drawCtx=cvs.getContext('2d'); drawCtx.lineWidth=3; drawCtx.strokeStyle='#ef4444'; drawCtx.lineCap='round'; drawCtx.lineJoin='round';
   const pos=(e)=>{const r=cvs.getBoundingClientRect(); if(e.touches){return {x:e.touches[0].clientX-r.left,y:e.touches[0].clientY-r.top};} return {x:e.clientX-r.left,y:e.clientY-r.top};};
-  cvs.addEventListener('mousedown',e=>{if(!drawActive)return;isDrawing=true;lastPt=pos(e);});
-  cvs.addEventListener('mousemove',e=>{if(!drawActive||!isDrawing)return;const p=pos(e);drawCtx.beginPath();drawCtx.moveTo(lastPt.x,lastPt.y);drawCtx.lineTo(p.x,p.y);drawCtx.stroke();lastPt=p;});
+
+  // Mouse
+  cvs.addEventListener('mousedown',e=>{if(!drawActive)return; isDrawing=true; lastPt=pos(e); e.preventDefault();});
+  cvs.addEventListener('mousemove',e=>{if(!drawActive||!isDrawing)return; const p=pos(e); drawCtx.beginPath(); drawCtx.moveTo(lastPt.x,lastPt.y); drawCtx.lineTo(p.x,p.y); drawCtx.stroke(); lastPt=p; e.preventDefault();});
   window.addEventListener('mouseup',()=>{isDrawing=false;});
-  cvs.addEventListener('touchstart',e=>{if(!drawActive)return;isDrawing=true;lastPt=pos(e);});
-  cvs.addEventListener('touchmove',e=>{if(!drawActive||!isDrawing)return;const p=pos(e);drawCtx.beginPath();drawCtx.moveTo(lastPt.x,lastPt.y);drawCtx.lineTo(p.x,p.y);drawCtx.stroke();lastPt=p; e.preventDefault();},{passive:false});
+
+  // Touch
+  cvs.addEventListener('touchstart',e=>{if(!drawActive)return; isDrawing=true; lastPt=pos(e); e.preventDefault();},{passive:false});
+  cvs.addEventListener('touchmove',e=>{if(!drawActive||!isDrawing)return; const p=pos(e); drawCtx.beginPath(); drawCtx.moveTo(lastPt.x,lastPt.y); drawCtx.lineTo(p.x,p.y); drawCtx.stroke(); lastPt=p; e.preventDefault();},{passive:false});
   window.addEventListener('touchend',()=>{isDrawing=false;});
   setDrawActive(false);
 }
@@ -442,6 +450,33 @@ function setDrawActive(on){
   const cvs=document.getElementById('stormDrawCanvas');
   cvs.style.pointerEvents = on ? 'auto' : 'none';
   document.getElementById('drawToggle').textContent = on ? '✅ Drawing' : '✏️ Draw';
+
+  // Lock/unlock map interactions while drawing
+  if(on){
+    prevInteract.drag = maps.storm.dragging.enabled();
+    prevInteract.scroll = maps.storm.scrollWheelZoom.enabled();
+    prevInteract.touch = maps.storm.touchZoom.enabled();
+    prevInteract.double = maps.storm.doubleClickZoom.enabled();
+    prevInteract.box = maps.storm.boxZoom.enabled();
+    prevInteract.kbd = maps.storm.keyboard.enabled();
+    prevInteract.tap = maps.storm.tap && maps.storm.tap.enabled && maps.storm.tap.enabled();
+
+    maps.storm.dragging.disable();
+    maps.storm.scrollWheelZoom.disable();
+    maps.storm.touchZoom.disable();
+    maps.storm.doubleClickZoom.disable();
+    maps.storm.boxZoom.disable();
+    maps.storm.keyboard.disable();
+    if(maps.storm.tap && maps.storm.tap.disable) maps.storm.tap.disable();
+  }else{
+    if(prevInteract.drag) maps.storm.dragging.enable();
+    if(prevInteract.scroll) maps.storm.scrollWheelZoom.enable();
+    if(prevInteract.touch) maps.storm.touchZoom.enable();
+    if(prevInteract.double) maps.storm.doubleClickZoom.enable();
+    if(prevInteract.box) maps.storm.boxZoom.enable();
+    if(prevInteract.kbd) maps.storm.keyboard.enable();
+    if(prevInteract.tap && maps.storm.tap && maps.storm.tap.enable) maps.storm.tap.enable();
+  }
 }
 function clearDrawing(){
   const cvs=document.getElementById('stormDrawCanvas');
@@ -449,7 +484,7 @@ function clearDrawing(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
 }
 
-/* ------------ Roulette ------------ */
+/* ======= Roulette ======= */
 function emojiDivIcon(char){return L.divIcon({className:'',html:`<div class="emoji-pin">${char}</div>`,iconSize:[22,22],iconAnchor:[11,11]});}
 async function roulette(lat,lon){
   document.getElementById('rouletteResults').innerHTML='<div class="loading" style="margin:20px auto;display:block"></div>';
@@ -476,7 +511,7 @@ async function roulette(lat,lon){
     <div class="twin-card"><div>${wildcard?`${wildcard.weather.temp}°F / ${wildcard.weather.dewpoint}° dew / ${wildcard.weather.pressure} hPa`:'—'}</div></div>`;
 }
 
-/* ------------ maps & UI ------------ */
+/* ======= maps & UI ======= */
 function initMaps(){
   // Local map
   maps.local=L.map('localMap').setView([userLocation.lat,userLocation.lon],8);
@@ -488,15 +523,15 @@ function initMaps(){
   maps.storm=L.map('stormMap').setView([39,-98],5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.storm);
   setupDrawCanvas();
-  loadRadarFrames();      // <-- get radar frames
-  setInterval(loadRadarFrames, 5*60*1000); // refresh frame list every 5 min
+  loadRadarFrames();
+  setInterval(loadRadarFrames,5*60*1000);
 
   // Roulette map
   maps.roulette=L.map('rouletteMap').setView([39,-98],4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors'}).addTo(maps.roulette);
   maps.roulette.on('click',e=>roulette(e.latlng.lat,e.latlng.lng));
 
-  // Controls
+  // Storm Lab controls
   document.getElementById('drawToggle').onclick=()=>setDrawActive(!drawActive);
   document.getElementById('clearDraw').onclick=clearDrawing;
   document.getElementById('radarPlay').onclick=playRadar;
@@ -531,7 +566,7 @@ function getUserLocation(){
   }
 }
 
-/* ------------ init ------------ */
+/* ======= init ======= */
 window.addEventListener('DOMContentLoaded',async()=>{
   initMaps();
   getUserLocation();
