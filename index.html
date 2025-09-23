@@ -98,7 +98,6 @@
 
 <nav class="tabs">
   <button class="tab active" onclick="switchTab(event,'local')">Your Weather</button>
-  <button class="tab" onclick="switchTab(event,'stormlab')">Storm Lab</button>
   <button class="tab" onclick="switchTab(event,'radar')">Radar (Draw)</button>
 </nav>
 
@@ -131,23 +130,11 @@
       <p style="color:var(--muted);margin:.5rem 0 .25rem">Next 5 days (min / max)</p>
       <div id="dewDays" class="timeline"></div>
 
+      <h3 style="margin-top:1rem">Fire Pit Forecast</h3>
+      <p style="color:var(--muted);margin:.25rem 0 .5rem">Best evenings this week for outdoor fires</p>
+      <div id="fireDays" class="timeline"></div>
+
       <div id="localMap" class="map"></div>
-    </div>
-  </section>
-
-  <!-- Storm Lab (unchanged layout) -->
-  <section id="stormlab" class="section">
-    <div class="card">
-      <h2>Storm Lab — Be the Meteorologist</h2>
-      <p style="color:var(--muted)">We surface the raw ingredients; you call the shot.</p>
-
-      <div class="timeline" id="stormSignals" style="margin-top:.75rem"></div>
-
-      <h3 style="margin-top:.75rem">Next 12 hours — DIY Raincast</h3>
-      <div id="raincast" class="timeline"></div>
-
-      <h3 style="margin-top:.75rem">Signals Dashboard</h3>
-      <div id="signalsDash" class="timeline"></div>
     </div>
   </section>
 
@@ -302,7 +289,7 @@ function renderOutcomeMeters(curr, next6){
   const avgClouds=Math.round(next6.reduce((a,b)=>a+(Number.isFinite(b.clouds)?b.clouds:50),0)/Math.max(1,next6.length));
   const R={ t:v=>({text:`${v}°F`,good:v>=60&&v<=78}), dp:v=>({text:`Td ${v}°`,good:v>=40&&v<=60}), wind:v=>({text:`Wind ${v} mph`,good:v<=12}), pop:v=>({text:`${v}% rain`,good:v<25}) };
 
-  // 1) Windows Open (custom labels)
+  // Windows Open — “gosh no” → “goshdarnit absolutely”
   let s1=100;
   if(curr.temp<55) s1-=(55-curr.temp)*2;
   if(curr.temp>78) s1-=(curr.temp-78)*1.5;
@@ -315,7 +302,7 @@ function renderOutcomeMeters(curr, next6){
   wrap.appendChild(c1);
   setGauge('m1',s1,'Comfort window for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
 
-  // 2) Windows-down drive
+  // Windows-down drive
   let s2=100;
   if(curr.temp<50) s2-=(50-curr.temp)*2;
   if(curr.temp>82) s2-=(curr.temp-82)*2;
@@ -326,7 +313,7 @@ function renderOutcomeMeters(curr, next6){
   wrap.appendChild(c2);
   setGauge('m2',s2,'Road-feel with windows down.',[R.t(curr.temp),R.dp(curr.dewpoint),R.pop(maxPop)]);
 
-  // 3) Run outside
+  // Run outside
   let s3=100;
   if(curr.temp<40) s3-=(40-curr.temp)*2.5;
   if(curr.temp>78) s3-=(curr.temp-78)*3;
@@ -338,7 +325,7 @@ function renderOutcomeMeters(curr, next6){
   wrap.appendChild(c3);
   setGauge('m3',s3,'Running comfort for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
 
-  // 4) Clothes comfort
+  // Clothes comfort
   let s4=100;
   if(curr.temp<60) s4-=(60-curr.temp)*1.2;
   if(curr.temp>80) s4-=(curr.temp-80)*1.5;
@@ -401,6 +388,47 @@ async function updateLocal(){
     days.appendChild(el);
   });
 
+  // Fire-pit evenings (6–11p) day-by-day
+  const fireEl=document.getElementById('fireDays'); fireEl.innerHTML='';
+  dayKeys.forEach(k=>{
+    const arr=(groups.get(k)||[]).filter(h=>{
+      const hr=new Date(h.time).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz});
+      const H=parseInt(hr,10); return H>=18 && H<=23;
+    });
+    if(!arr.length) return;
+
+    const avgDew=Math.round(arr.reduce((a,b)=>a+b.dp,0)/arr.length);
+    const avgTemp=Math.round(arr.reduce((a,b)=>a+b.temp,0)/arr.length);
+    const maxWind=Math.max(...arr.map(h=>h.wind));
+    const maxPop=Math.max(...arr.map(h=>h.pop??0));
+    const avgClouds=Math.round(arr.reduce((a,b)=>a+(Number.isFinite(b.clouds)?b.clouds:50),0)/arr.length);
+
+    let score=100;
+    if(avgDew<35) score-= (35-avgDew)*2.5;
+    if(avgDew>55) score-= (avgDew-55)*2.5;
+    if(maxWind>10) score-= (maxWind-10)*3;
+    if(maxWind>20) score=0;
+    score-= maxPop*0.8;
+    if(avgClouds>30) score-= (avgClouds-30)*0.5;
+    if(avgTemp<55) score-= (55-avgTemp);
+    if(avgTemp>75) score-= (avgTemp-75)*0.5;
+    score=Math.max(0,Math.min(100,score));
+
+    let rating='',color='';
+    if(score>=80){rating='🔥🔥🔥';color='#10b981';}
+    else if(score>=60){rating='🔥🔥';color='#f59e0b';}
+    else if(score>=40){rating='🔥';color='#64748b';}
+    else {rating='❌';color='#dc2626';}
+
+    const el=document.createElement('div');
+    el.className='bucket'; el.style.minWidth='110px';
+    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short', timeZone: tz})}</strong>
+      <div style="font-size:1.5rem">${rating}</div>
+      <div class="mini" style="color:${color}">${Math.round(score)}% ideal</div>
+      <div class="mini" style="font-size:.6rem">${avgTemp}°F • ${maxWind}mph<br>${maxPop}% rain • ${avgClouds}% clouds</div>`;
+    fireEl.appendChild(el);
+  });
+
   // Fire-pit hint tonight (6–11p)
   const tonightKey=dayKeys[0];
   if(tonightKey){
@@ -419,53 +447,6 @@ async function updateLocal(){
 
   // Outcomes
   renderOutcomeMeters(d, corrected.slice(0,6));
-
-  // Storm Lab refresh
-  renderStormLab(corrected);
-}
-
-/* ========= Storm Lab (kept same spirit/format) ========= */
-function bar(name,score,desc,emoji){ // small card with progress bar
-  const wrap=document.createElement('div'); wrap.className='bucket'; wrap.style.minWidth='220px';
-  const pct=clamp(Math.round(score),0,100);
-  wrap.innerHTML=`<strong>${emoji||''} ${name}</strong>
-    <div style="height:10px;border-radius:999px;overflow:hidden;background:#e5e7eb;margin:.35rem 0">
-      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#22c55e,#16a34a)"></div>
-    </div>
-    <div class="mini">${desc}</div>`;
-  return wrap;
-}
-function renderStormLab(hours){
-  // simple signals
-  const next12=hours.slice(0,12);
-  const dpTrend = next12.length? next12[next12.length-1].dp - next12[0].dp : 0;
-  const cloudAvg=Math.round(next12.reduce((a,b)=>a+(b.clouds??50),0)/Math.max(1,next12.length));
-  const maxPop=Math.max(...next12.map(h=>h.pop??0),0);
-
-  const signals=document.getElementById('stormSignals'); signals.innerHTML='';
-  const etaIndex=next12.findIndex(h=> (h.pop??0) >= 40 || (h.clouds??0)>80 );
-  signals.appendChild(bar('Rain ETA Guess', clamp((12- (etaIndex>=0?etaIndex:12))*8.5,0,100),
-    etaIndex>=0?`Peak signal around ${fmtTime(next12[etaIndex].time)}`:'Weak signal in the next 12h','⏱'));
-  signals.appendChild(bar('Pressure Falling', 49+(Math.random()*6|0), 'Falling pressure = rising chances','🧭'));
-  signals.appendChild(bar('Dewpoint Rising', clamp(40 + dpTrend*3,0,100), 'More moisture = more fuel','💧'));
-
-  // DIY raincast hour buckets
-  const rc=document.getElementById('raincast'); rc.innerHTML='';
-  next12.forEach(h=>{
-    const el=document.createElement('div'); el.className='bucket';
-    el.innerHTML=`<strong>${fmtTime(h.time)}</strong>
-      <div class="tval">${h.pop??0}</div>
-      <div class="mini">${h.pop??0}% pop • ${h.clouds??0}% cld<br>${h.temp}° dp ${h.dp}°</div>`;
-    rc.appendChild(el);
-  });
-
-  // Signals dashboard tiles (lightweight proxies)
-  const dash=document.getElementById('signalsDash'); dash.innerHTML='';
-  const mk=(title,val,sub)=>{ const el=document.createElement('div'); el.className='bucket'; el.style.minWidth='180px'; el.innerHTML=`<strong>${title}</strong><div class="tval">${val}</div><div class="mini">${sub}</div>`; return el; };
-  dash.appendChild(mk('Cloud Cover', `${cloudAvg}%`, cloudAvg>70?'Thickening cloud → developing weather':'Thin clouds / sun'));
-  dash.appendChild(mk('Wind Dir', '—', 'Watch for wind shifts/convergence'));
-  dash.appendChild(mk('Pressure', '—', 'Falling = trouble brewing'));
-  dash.appendChild(mk('Dew Point', `${hours[0]?.dp??'—'}°F`, dpTrend>0?'Rising = added moisture':'Steady/Lowering'));
 }
 
 /* ========= Maps ========= */
@@ -531,7 +512,6 @@ function endDraw(e){
   if(tool==='text'){
     const txt=prompt('Label text:'); if(txt){ const m=L.marker(ll,{icon:L.divIcon({className:'',html:`<div style="font-weight:700;color:${drawColor};text-shadow:0 1px 2px #fff">${txt}</div>`})}).addTo(drawLayer); shapes.push(m); }
   }else if(tool==='arrow'){
-    // add a rotated arrowhead
     const a=maps.radar.latLngToLayerPoint(pts[pts.length-2]), b=maps.radar.latLngToLayerPoint(pts[pts.length-1]);
     const angle=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI;
     const head=L.marker(pts[pts.length-1],{icon:L.divIcon({className:'',html:`<div class="arrowhead" style="transform:rotate(${angle}deg);color:${drawColor}">➤</div>`}),interactive:false});
