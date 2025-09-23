@@ -52,7 +52,7 @@
 
     .map{height:560px;border-radius:1rem;overflow:hidden;margin:1rem 0}
 
-    /* ===== Outcome meters v2 (unchanged) ===== */
+    /* ===== Outcome meters v2 ===== */
     .outcomes{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.9rem;margin-top:.5rem}
     .out{background:#f8fafc;border:1px solid #e2e8f0;border-radius:.9rem;padding:.9rem}
     .out h4{font-size:1rem;margin:0 0 .45rem;display:flex;gap:.5rem;align-items:center;justify-content:space-between}
@@ -106,7 +106,7 @@
 </nav>
 
 <div class="content">
-  <!-- Your Weather (unchanged) -->
+  <!-- Your Weather -->
   <section id="local" class="section active">
     <div class="card" style="position:relative">
       <div class="data-age" id="dataAge">Data: -- min old</div>
@@ -149,6 +149,7 @@
       <div class="toolrow toolbar">
         <!-- draw tools -->
         <button class="toolbtn active" id="tool-pen">✏️ Pen</button>
+        <button class="toolbtn" id="tool-hand">🖐 Hand</button>
         <button class="toolbtn" id="tool-arrow">➤ Arrow</button>
         <button class="toolbtn" id="tool-rect">▭ Box</button>
         <button class="toolbtn" id="tool-circle">◯ Circle</button>
@@ -208,7 +209,7 @@ function dewpointFromTRH(tF, rh){const tC=(tF-32)*5/9;const a=17.625,b=243.04;co
 const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz});
 const todayKeyInTz=(tz)=> new Date().toLocaleDateString('en-CA',{timeZone:tz});
 
-/* ========= Weather service (unchanged) ========= */
+/* ========= Weather service ========= */
 class Weather{
   constructor(){ this.cache=new Map(); this.CACHE=5*60*1000; }
   async get(lat,lon){
@@ -264,7 +265,7 @@ const weather=new Weather();
 let userLocation={lat:33.0318,lon:-79.7287}; // Huger, SC default
 let maps={}; let drawState=null; let drawLayer=null; let shapes=[];
 
-/* ========= Outcomes (unchanged logic) ========= */
+/* ========= Outcomes ========= */
 function gradeLabel(s){ if(s>=85) return ['Perfect','positive']; if(s>=70) return ['Good','positive']; if(s>=50) return ['Okay','neutral']; return ['Nope','negative']; }
 function makeGaugeCard(id, icon, title, baseDesc, extremes){
   const el=document.createElement('div'); el.className='out';
@@ -300,42 +301,30 @@ function renderOutcomeMeters(curr, next6){
   const maxWind=Math.max(...next6.map(h=>h.wind??0),curr.wind??0);
   const R={ t:v=>({text:`${v}°F`,good:v>=60&&v<=78}), dp:v=>({text:`Td ${v}°`,good:v>=40&&v<=60}), wind:v=>({text:`Wind ${v} mph`,good:v<=12}), pop:v=>({text:`${v}% rain`,good:v<25}) };
 
-let s1 = 100;
+  // Windows Open (humidity stricter per your change)
+  let s1=100;
+  if(curr.temp<55) s1-=(55-curr.temp)*2;
+  if(curr.temp>78) s1-=(curr.temp-78)*1.5;
+  if(curr.dewpoint<35) s1-=(35-curr.dewpoint)*2;
+  if(curr.dewpoint>60) s1-=(curr.dewpoint-60)*4;
+  if(curr.dewpoint>=70) s1=Math.min(s1,20);
+  if(maxWind>18) s1-=(maxWind-18)*2.5;
+  s1-=(maxPop||0)*0.6;
+  s1=clamp(s1,0,100);
+  const c1=makeGaugeCard('m1','🪟','Windows Open','Comfort with outside air in the house.',['gosh no','meh','nice','goshdarnit absolutely']); wrap.appendChild(c1);
+  setGauge('m1',s1,'Comfort window for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
 
-// Temp comfort
-if (curr.temp < 55) s1 -= (55 - curr.temp) * 2;
-if (curr.temp > 78) s1 -= (curr.temp - 78) * 1.5;
-
-// Dew point (humidity) — tougher thresholds
-if (curr.dewpoint < 35) s1 -= (35 - curr.dewpoint) * 2;     // too dry
-if (curr.dewpoint > 60) s1 -= (curr.dewpoint - 60) * 4;     // was >65 *2.5 → now >60 *4
-if (curr.dewpoint >= 70) s1 = Math.min(s1, 20);             // hard cap when swampy
-
-// Wind & rain
-if (maxWind > 18) s1 -= (maxWind - 18) * 2.5;
-s1 -= (maxPop || 0) * 0.6;
-
-s1 = clamp(s1, 0, 100);
-
-// UI (unchanged)
-const c1 = makeGaugeCard(
-  'm1','🪟','Windows Open',
-  'Comfort with outside air in the house.',
-  ['gosh no','meh','nice','goshdarnit absolutely']
-);
-wrap.appendChild(c1);
-setGauge('m1', s1, 'Comfort window for the next few hours.', [
-  R.t(curr.temp), R.dp(curr.dewpoint), R.wind(maxWind), R.pop(maxPop)
-]);
-
+  // Windows-Down Drive
   let s2=100; if(curr.temp<50) s2-=(50-curr.temp)*2; if(curr.temp>82) s2-=(curr.temp-82)*2; if(curr.dewpoint>68) s2-=(curr.dewpoint-68)*2; s2-=maxPop*0.9; s2=clamp(s2,0,100);
   const c2=makeGaugeCard('m2','🚗','Windows-Down Drive','Open-air cruising comfort.',['Windows up','Borderline','Fun','Breezy bliss']); wrap.appendChild(c2);
   setGauge('m2',s2,'Road-feel with windows down.',[R.t(curr.temp),R.dp(curr.dewpoint),R.pop(maxPop)]);
 
+  // Run Outside
   let s3=100; if(curr.temp<40) s3-=(40-curr.temp)*2.5; if(curr.temp>78) s3-=(curr.temp-78)*3; if(curr.dewpoint>65) s3-=(curr.dewpoint-65)*2.5; if(maxWind>20) s3-=(maxWind-20)*3; s3-=maxPop*1.0; s3=clamp(s3,0,100);
   const c3=makeGaugeCard('m3','🏃','Run Outside','Temp, humidity, wind & rain risk.',['Sluggish','Decent','Good','PR day']); wrap.appendChild(c3);
   setGauge('m3',s3,'Running comfort for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
 
+  // Clothes Comfort
   let s4=100; if(curr.temp<60) s4-=(60-curr.temp)*1.2; if(curr.temp>80) s4-=(curr.temp-80)*1.5; if(curr.dewpoint>67) s4-=(curr.dewpoint-67)*1.8; s4=clamp(s4,0,100);
   const wear=suggestClothes(curr.temp); const c4=makeGaugeCard('m4','👕','Clothes Comfort',wear,['Bundled','Layered','Light','T-shirt']); wrap.appendChild(c4);
   setGauge('m4',s4, wear, [R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind)]);
@@ -449,11 +438,18 @@ async function updateLocal(){
 
 /* ========= Maps ========= */
 function initMaps(){
+  // Local map + global marker (so Set updates the pin)
   maps.local=L.map('localMap').setView([userLocation.lat,userLocation.lon],9);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(maps.local);
-  const marker=L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
-  maps.local.on('click',async e=>{ userLocation={lat:e.latlng.lat,lon:e.latlng.lng}; marker.setLatLng(e.latlng); document.getElementById('locationInput').value=`${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`; await updateLocal(); });
+  maps.localMarker = L.marker([userLocation.lat,userLocation.lon]).addTo(maps.local);
+  maps.local.on('click',async e=>{
+    userLocation={lat:e.latlng.lat,lon:e.latlng.lng};
+    maps.localMarker.setLatLng(e.latlng);
+    document.getElementById('locationInput').value=`${userLocation.lat.toFixed(4)}, ${userLocation.lon.toFixed(4)}`;
+    await updateLocal();
+  });
 
+  // Radar map
   maps.radar=L.map('radarMap',{zoomControl:true}).setView([userLocation.lat,userLocation.lon],7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(maps.radar);
 
@@ -465,12 +461,11 @@ let rv={frames:[], layers:[], index:0, timer:null, speed:600, pastCount:0};
 async function loadRadarFrames(){
   try{
     const data=await fetchJSON('https://api.rainviewer.com/public/weather-maps.json',9000);
-    const past=(data.radar?.past||[]).slice(-8); // last ~80 minutes
-    const future=(data.radar?.nowcast||[]).slice(0,12); // up to ~120 min ahead (if available)
+    const past=(data.radar?.past||[]).slice(-8);
+    const future=(data.radar?.nowcast||[]).slice(0,12);
     rv.frames=[...past, ...future];
     rv.pastCount=past.length;
 
-    // Build layers (preload, keep drawings above)
     rv.layers.forEach(l=>maps.radar.removeLayer(l));
     rv.layers = rv.frames.map(f=>{
       const url=`https://tilecache.rainviewer.com/v2/radar/${f.path}/256/{z}/{x}/{y}/2/1_1.png`;
@@ -478,10 +473,9 @@ async function loadRadarFrames(){
     });
     rv.layers.forEach(l=>l.addTo(maps.radar));
 
-    // UI
     const slider=document.getElementById('rv-slider');
     slider.max=String(rv.frames.length-1);
-    slider.value=String(rv.pastCount-1); // start at latest past
+    slider.value=String(rv.pastCount-1);
     rv.index=rv.pastCount-1;
     updateRadarTime();
     showFrame(rv.index);
@@ -513,12 +507,21 @@ function pause(){
 function nextFrame(){ showFrame( (rv.index+1) % rv.frames.length ); }
 function prevFrame(){ showFrame( (rv.index-1+rv.frames.length) % rv.frames.length ); }
 
-/* ========= Telestrator ========= */
+/* ========= Telestrator (with Hand tool) ========= */
 let tool='pen', drawColor='#111827', drawWidth=4;
-function setActiveTool(id){ document.querySelectorAll('.toolbtn').forEach(b=>b.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function setActiveTool(id){
+  document.querySelectorAll('.toolbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
 function startDraw(e){
   if(!maps.radar) return;
-  maps.radar.dragging.disable(); maps.radar.doubleClickZoom.disable();
+  // Disable map interactions while drawing
+  maps.radar.dragging.disable();
+  maps.radar.doubleClickZoom.disable();
+  maps.radar.scrollWheelZoom.disable();
+  maps.radar.boxZoom.disable();
+  maps.radar.keyboard.disable();
+
   const ll=e.latlng; drawState={tool, color:drawColor, width:drawWidth, points:[ll]};
   if(tool==='pen'){ drawState.shape=L.polyline([ll],{color:drawColor,weight:drawWidth,opacity:1}).addTo(drawLayer); }
   else if(tool==='rect'){ drawState.shape=L.rectangle([ll,ll],{color:drawColor,weight:drawWidth,fill:false}).addTo(drawLayer); }
@@ -534,7 +537,15 @@ function moveDraw(e){
   else if(tool==='arrow'){ drawState.shape.setLatLngs([pts[0],ll]); }
 }
 function endDraw(e){
-  if(!drawState){ maps.radar.dragging.enable(); maps.radar.doubleClickZoom.enable(); return; }
+  if(!drawState){
+    // ensure interactions are enabled
+    maps.radar.dragging.enable();
+    maps.radar.doubleClickZoom.enable();
+    maps.radar.scrollWheelZoom.enable();
+    maps.radar.boxZoom.enable();
+    maps.radar.keyboard.enable();
+    return;
+  }
   const ll=e.latlng; const pts=drawState.points; pts.push(ll);
 
   if(tool==='text'){
@@ -546,23 +557,50 @@ function endDraw(e){
     head.addTo(drawLayer); shapes.push(head); shapes.push(drawState.shape);
   }else{ shapes.push(drawState.shape); }
 
-  drawState=null; maps.radar.dragging.enable(); maps.radar.doubleClickZoom.enable();
+  drawState=null;
+  // Re-enable interactions after drawing
+  maps.radar.dragging.enable();
+  maps.radar.doubleClickZoom.enable();
+  maps.radar.scrollWheelZoom.enable();
+  maps.radar.boxZoom.enable();
+  maps.radar.keyboard.enable();
 }
 function bindTelestrator(){
-  document.getElementById('tool-pen').onclick=()=>{tool='pen'; setActiveTool('tool-pen');};
-  document.getElementById('tool-arrow').onclick=()=>{tool='arrow'; setActiveTool('tool-arrow');};
-  document.getElementById('tool-rect').onclick=()=>{tool='rect'; setActiveTool('tool-rect');};
-  document.getElementById('tool-circle').onclick=()=>{tool='circle'; setActiveTool('tool-circle');};
-  document.getElementById('tool-text').onclick=()=>{tool='text'; setActiveTool('tool-text');};
-  document.getElementById('penWidth').oninput=(e)=>{drawWidth=parseInt(e.target.value,10)||4;};
-  document.querySelectorAll('.colorchip').forEach(c=>c.onclick=()=>{drawColor=c.dataset.color;});
+  document.getElementById('tool-pen').onclick=()=>{ tool='pen'; setActiveTool('tool-pen'); };
+  document.getElementById('tool-hand').onclick=()=>{ tool='hand'; setActiveTool('tool-hand');
+    // Fully enable map interactions in hand mode
+    maps.radar.dragging.enable();
+    maps.radar.doubleClickZoom.enable();
+    maps.radar.scrollWheelZoom.enable();
+    maps.radar.boxZoom.enable();
+    maps.radar.keyboard.enable();
+  };
+  document.getElementById('tool-arrow').onclick=()=>{ tool='arrow'; setActiveTool('tool-arrow'); };
+  document.getElementById('tool-rect').onclick=()=>{ tool='rect'; setActiveTool('tool-rect'); };
+  document.getElementById('tool-circle').onclick=()=>{ tool='circle'; setActiveTool('tool-circle'); };
+  document.getElementById('tool-text').onclick=()=>{ tool='text'; setActiveTool('tool-text'); };
+  document.getElementById('penWidth').oninput=(e)=>{ drawWidth=parseInt(e.target.value,10)||4; };
+  document.querySelectorAll('.colorchip').forEach(c=>c.onclick=()=>{ drawColor=c.dataset.color; });
   document.getElementById('tool-undo').onclick=()=>{ const last=shapes.pop(); if(last){ drawLayer.removeLayer(last);} };
   document.getElementById('tool-clear').onclick=()=>{ drawLayer.clearLayers(); shapes=[]; };
 
-  maps.radar.on('mousedown',e=>{ if(tool!=='text') startDraw(e); else { startDraw(e); endDraw(e);} });
-  maps.radar.on('mousemove',moveDraw);
-  maps.radar.on('mouseup',endDraw);
-  maps.radar.on('mouseleave',()=>{ if(drawState){ maps.radar.dragging.enable(); maps.radar.doubleClickZoom.enable(); drawState=null; }});
+  // Skip drawing in hand mode; let Leaflet pan/zoom normally
+  maps.radar.on('mousedown', e => {
+    if(tool==='hand') return; // pan/zoom only
+    if(tool!=='text') startDraw(e); else { startDraw(e); endDraw(e); }
+  });
+  maps.radar.on('mousemove', moveDraw);
+  maps.radar.on('mouseup', endDraw);
+  maps.radar.on('mouseleave', () => {
+    if(drawState){
+      drawState=null;
+      maps.radar.dragging.enable();
+      maps.radar.doubleClickZoom.enable();
+      maps.radar.scrollWheelZoom.enable();
+      maps.radar.boxZoom.enable();
+      maps.radar.keyboard.enable();
+    }
+  });
 }
 
 /* ========= Animation controls wiring ========= */
@@ -586,8 +624,11 @@ window.switchTab=function(evt, tab){
 };
 window.setLocation=async function(){
   const input=document.getElementById('locationInput').value; const parts=input.split(',').map(s=>parseFloat(s.trim()));
-  if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){ userLocation={lat:parts[0],lon:parts[1]};
+  if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){
+    userLocation={lat:parts[0],lon:parts[1]};
+    // update map views
     maps.local.setView([userLocation.lat,userLocation.lon],9);
+    if (maps.localMarker) maps.localMarker.setLatLng([userLocation.lat,userLocation.lon]); // keep pin in sync
     maps.radar.setView([userLocation.lat,userLocation.lon],7);
     await updateLocal(); await loadRadarFrames();
   }else alert('Enter as: latitude, longitude');
