@@ -300,9 +300,33 @@ function renderOutcomeMeters(curr, next6){
   const maxWind=Math.max(...next6.map(h=>h.wind??0),curr.wind??0);
   const R={ t:v=>({text:`${v}°F`,good:v>=60&&v<=78}), dp:v=>({text:`Td ${v}°`,good:v>=40&&v<=60}), wind:v=>({text:`Wind ${v} mph`,good:v<=12}), pop:v=>({text:`${v}% rain`,good:v<25}) };
 
-  let s1=100; if(curr.temp<55) s1-=(55-curr.temp)*2; if(curr.temp>78) s1-=(curr.temp-78)*1.5; if(curr.dewpoint<35) s1-=(35-curr.dewpoint)*2; if(curr.dewpoint>65) s1-=(curr.dewpoint-65)*2.5; if(maxWind>18) s1-=(maxWind-18)*2.5; s1-=maxPop*0.6; s1=clamp(s1,0,100);
-  const c1=makeGaugeCard('m1','🪟','Windows Open','Comfort with outside air in the house.',['gosh no','meh','nice','goshdarnit absolutely']); wrap.appendChild(c1);
-  setGauge('m1',s1,'Comfort window for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
+let s1 = 100;
+
+// Temp comfort
+if (curr.temp < 55) s1 -= (55 - curr.temp) * 2;
+if (curr.temp > 78) s1 -= (curr.temp - 78) * 1.5;
+
+// Dew point (humidity) — tougher thresholds
+if (curr.dewpoint < 35) s1 -= (35 - curr.dewpoint) * 2;     // too dry
+if (curr.dewpoint > 60) s1 -= (curr.dewpoint - 60) * 4;     // was >65 *2.5 → now >60 *4
+if (curr.dewpoint >= 70) s1 = Math.min(s1, 20);             // hard cap when swampy
+
+// Wind & rain
+if (maxWind > 18) s1 -= (maxWind - 18) * 2.5;
+s1 -= (maxPop || 0) * 0.6;
+
+s1 = clamp(s1, 0, 100);
+
+// UI (unchanged)
+const c1 = makeGaugeCard(
+  'm1','🪟','Windows Open',
+  'Comfort with outside air in the house.',
+  ['gosh no','meh','nice','goshdarnit absolutely']
+);
+wrap.appendChild(c1);
+setGauge('m1', s1, 'Comfort window for the next few hours.', [
+  R.t(curr.temp), R.dp(curr.dewpoint), R.wind(maxWind), R.pop(maxPop)
+]);
 
   let s2=100; if(curr.temp<50) s2-=(50-curr.temp)*2; if(curr.temp>82) s2-=(curr.temp-82)*2; if(curr.dewpoint>68) s2-=(curr.dewpoint-68)*2; s2-=maxPop*0.9; s2=clamp(s2,0,100);
   const c2=makeGaugeCard('m2','🚗','Windows-Down Drive','Open-air cruising comfort.',['Windows up','Borderline','Fun','Breezy bliss']); wrap.appendChild(c2);
