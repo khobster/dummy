@@ -298,10 +298,11 @@ function suggestClothes(t){ if(t<=35) return 'Heavy coat, hat, gloves'; if(t<=50
 function renderOutcomeMeters(curr, next6){
   const wrap=document.getElementById('outcomesMeters'); wrap.innerHTML='';
   const maxPop=Math.max(...next6.map(h=>h.pop??0),0);
-  const maxWind=Math.max(...next6.map(h=>h.wind??0),curr.wind??0);
+  /* CHANGED: forecast-only wind with a reasonable cap */
+  const maxWind = Math.min(40, Math.max(...next6.map(h => h.wind ?? 0), 0));
   const R={ t:v=>({text:`${v}°F`,good:v>=60&&v<=78}), dp:v=>({text:`Td ${v}°`,good:v>=40&&v<=60}), wind:v=>({text:`Wind ${v} mph`,good:v<=12}), pop:v=>({text:`${v}% rain`,good:v<25}) };
 
-  // Windows Open (humidity stricter per your change)
+  // Windows Open (strict humidity)
   let s1=100;
   if(curr.temp<55) s1-=(55-curr.temp)*2;
   if(curr.temp>78) s1-=(curr.temp-78)*1.5;
@@ -324,8 +325,13 @@ function renderOutcomeMeters(curr, next6){
   const c3=makeGaugeCard('m3','🏃','Run Outside','Temp, humidity, wind & rain risk.',['Sluggish','Decent','Good','PR day']); wrap.appendChild(c3);
   setGauge('m3',s3,'Running comfort for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
 
-  // Clothes Comfort
-  let s4=100; if(curr.temp<60) s4-=(60-curr.temp)*1.2; if(curr.temp>80) s4-=(curr.temp-80)*1.5; if(curr.dewpoint>67) s4-=(curr.dewpoint-67)*1.8; s4=clamp(s4,0,100);
+  // Clothes Comfort (CHANGED: humidity + wind penalties)
+  let s4=100;
+  if(curr.temp<60) s4-=(60-curr.temp)*1.2;
+  if(curr.temp>80) s4-=(curr.temp-80)*1.5;
+  if(curr.dewpoint>62) s4-=(curr.dewpoint-62)*2.0;     /* changed */
+  if(maxWind>18) s4-=(maxWind-18)*1.5;                 /* changed */
+  s4=clamp(s4,0,100);
   const wear=suggestClothes(curr.temp); const c4=makeGaugeCard('m4','👕','Clothes Comfort',wear,['Bundled','Layered','Light','T-shirt']); wrap.appendChild(c4);
   setGauge('m4',s4, wear, [R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind)]);
 }
@@ -406,8 +412,8 @@ async function updateLocal(){
     let rating='',color='';
     if(score>=80){rating='🔥🔥🔥';color='#10b981';}
     else if(score>=60){rating='🔥🔥';color='#f59e0b';}
-    else if(score>=40){rating='🔥';color='#64748b';}
-    else {rating='❌';color='#dc2626';}
+    else if(score>=40){rating='🔥';color:'#64748b';}
+    else {rating='❌';color:'#dc2626';}
 
     const el=document.createElement('div');
     el.className='bucket'; el.style.minWidth='110px';
