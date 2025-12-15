@@ -471,8 +471,13 @@ async function updateLocal(){
               :spread<10?'Very humid — condensation risk'
               :spread<20?'Comfortable moisture'
               :'Dry air — static likely';
+  const vpdDesc = dv < 0.1 ? 'Near saturation — very humid' 
+                : dv < 0.4 ? 'Humid air' 
+                : dv < 0.8 ? 'Comfortable humidity'
+                : dv < 1.5 ? 'Dry air'
+                : 'Very dry — skin/plants will feel it';
   document.getElementById('moistureInsight').innerHTML=
-    `<strong>Moisture Status:</strong> ${moist}<br><strong>VPD ${dv} kPa:</strong> ${dv<0.5?'Air is saturated':dv>2?'Air is very thirsty':'Moderate'}`;
+    `<strong>Moisture Status:</strong> ${moist}<br><strong>VPD ${dv} kPa:</strong> ${vpdDesc}`;
 
   let fc=await weather.hourly(userLocation.lat,userLocation.lon);
   const biasRaw=(fc.omCurrentDp!=null && Number.isFinite(d.dewpoint))?(d.dewpoint-fc.omCurrentDp):0;
