@@ -123,7 +123,7 @@
       </div>
 
       <div class="insight" id="moistureInsight">Analyzing moisture dynamics…</div>
-      <div class="insight" id="firepitHint">Checking tonight’s fire-pit potential…</div>
+      <div class="insight" id="firepitHint">Checking tonight's fire-pit potential…</div>
 
       <h3 style="margin-top:.5rem">Outcomes (for humans)</h3>
       <div class="outcomes" id="outcomesMeters"></div>
@@ -208,6 +208,12 @@ function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237
 function dewpointFromTRH(tF, rh){const tC=(tF-32)*5/9;const a=17.625,b=243.04;const g=Math.log(Math.max(1e-6,rh/100))+(a*tC)/(b+tC);const dC=(b*g)/(a-g);return dC*9/5+32;}
 const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz});
 const todayKeyInTz=(tz)=> new Date().toLocaleDateString('en-CA',{timeZone:tz});
+
+/* Wind chill calculation (NWS formula, valid for T <= 50°F and wind >= 3 mph) */
+function windChill(tF, windMph) {
+  if (tF > 50 || windMph < 3) return tF;
+  return 35.74 + 0.6215 * tF - 35.75 * Math.pow(windMph, 0.16) + 0.4275 * tF * Math.pow(windMph, 0.16);
+}
 
 /* ========= Weather service ========= */
 class Weather{
@@ -294,46 +300,157 @@ function setGauge(id, score, desc, reasons){
   dEl.textContent=desc;
   rEl.innerHTML=''; (reasons||[]).forEach(({text,good})=>{ const s=document.createElement('span'); s.className=`badge ${good===true?'positive':good===false?'negative':''}`; s.textContent=text; rEl.appendChild(s); });
 }
-function suggestClothes(t){ if(t<=35) return 'Heavy coat, hat, gloves'; if(t<=50) return 'Jacket + layers'; if(t<=60) return 'Light jacket / long sleeves'; if(t<=70) return 'Breathable tee + shorts'; if(t<=80) return 'Tee + shorts, light colors'; if(t<=90) return 'Very light, hydrate'; return 'Minimal & shade; avoid peak heat'; }
+
+function suggestClothes(t, feelsLike) {
+  // Use feels-like temp for recommendations
+  const effective = feelsLike ?? t;
+  if(effective <= 20) return 'Heavy winter gear, limit exposure';
+  if(effective <= 32) return 'Heavy coat, hat, gloves, layers';
+  if(effective <= 45) return 'Warm jacket, hat, maybe gloves';
+  if(effective <= 55) return 'Jacket or fleece + long sleeves';
+  if(effective <= 65) return 'Light jacket or long sleeves';
+  if(effective <= 75) return 'T-shirt, light layers optional';
+  if(effective <= 85) return 'Light breathable clothes';
+  if(effective <= 95) return 'Minimal, stay hydrated';
+  return 'Dangerously hot — limit outdoor time';
+}
+
 function renderOutcomeMeters(curr, next6){
   const wrap=document.getElementById('outcomesMeters'); wrap.innerHTML='';
   const maxPop=Math.max(...next6.map(h=>h.pop??0),0);
-  /* CHANGED: forecast-only wind with a reasonable cap */
-  const maxWind = Math.min(40, Math.max(...next6.map(h => h.wind ?? 0), 0));
-  const R={ t:v=>({text:`${v}°F`,good:v>=60&&v<=78}), dp:v=>({text:`Td ${v}°`,good:v>=40&&v<=60}), wind:v=>({text:`Wind ${v} mph`,good:v<=12}), pop:v=>({text:`${v}% rain`,good:v<25}) };
+  const maxWind = Math.min(40, Math.max(...next6.map(h => h.wind ?? 0), curr.wind || 0));
+  
+  // Calculate wind chill / feels-like for cold weather
+  const feelsLike = Math.round(windChill(curr.temp, curr.wind));
+  
+  // Badge helper with wind chill awareness
+  const R = {
+    t: v => ({ text: `${v}°F`, good: v >= 55 && v <= 80 }),
+    feels: v => ({ text: `Feels ${v}°`, good: v >= 50 && v <= 75 }),
+    dp: v => ({ text: `Td ${v}°`, good: v >= 40 && v <= 60 }),
+    wind: v => ({ text: `Wind ${v} mph`, good: v <= 10 }),
+    pop: v => ({ text: `${v}% rain`, good: v < 25 })
+  };
 
-  // Windows Open (strict humidity)
-  let s1=100;
-  if(curr.temp<55) s1-=(55-curr.temp)*2;
-  if(curr.temp>78) s1-=(curr.temp-78)*1.5;
-  if(curr.dewpoint<35) s1-=(35-curr.dewpoint)*2;
-  if(curr.dewpoint>60) s1-=(curr.dewpoint-60)*4;
-  if(curr.dewpoint>=70) s1=Math.min(s1,20);
-  if(maxWind>18) s1-=(maxWind-18)*2.5;
-  s1-=(maxPop||0)*0.6;
-  s1=clamp(s1,0,100);
-  const c1=makeGaugeCard('m1','🪟','Windows Open','Comfort with outside air in the house.',['gosh no','meh','nice','goshdarnit absolutely']); wrap.appendChild(c1);
-  setGauge('m1',s1,'Comfort window for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
+  // ============ WINDOWS OPEN ============
+  // Ideal: 60-78°F, low humidity, light wind
+  let s1 = 100;
+  
+  // Cold penalties (aggressive)
+  if (curr.temp < 55) s1 -= (55 - curr.temp) * 4;      // Below 55 gets bad fast
+  if (curr.temp < 45) s1 -= (45 - curr.temp) * 3;      // Extra penalty below 45
+  if (curr.temp < 32) s1 = Math.min(s1, 5);            // Freezing = basically 0
+  
+  // Hot penalties
+  if (curr.temp > 78) s1 -= (curr.temp - 78) * 2;
+  if (curr.temp > 85) s1 -= (curr.temp - 85) * 3;
+  
+  // Humidity penalties
+  if (curr.dewpoint < 35) s1 -= (35 - curr.dewpoint) * 1.5;
+  if (curr.dewpoint > 60) s1 -= (curr.dewpoint - 60) * 4;
+  if (curr.dewpoint >= 70) s1 = Math.min(s1, 15);
+  
+  // Wind penalty (drafty)
+  if (maxWind > 15) s1 -= (maxWind - 15) * 2;
+  
+  // Rain penalty
+  s1 -= (maxPop || 0) * 0.6;
+  
+  s1 = clamp(s1, 0, 100);
+  const c1 = makeGaugeCard('m1', '🪟', 'Windows Open', 'Comfort with outside air in the house.', ['gosh no', 'meh', 'nice', 'perfect']);
+  wrap.appendChild(c1);
+  setGauge('m1', s1, curr.temp < 50 ? 'Too cold for open windows.' : curr.temp > 82 ? 'Too hot — use AC.' : 'Comfort window for the next few hours.', [R.t(curr.temp), R.dp(curr.dewpoint), R.wind(maxWind), R.pop(maxPop)]);
 
-  // Windows-Down Drive
-  let s2=100; if(curr.temp<50) s2-=(50-curr.temp)*2; if(curr.temp>82) s2-=(curr.temp-82)*2; if(curr.dewpoint>68) s2-=(curr.dewpoint-68)*2; s2-=maxPop*0.9; s2=clamp(s2,0,100);
-  const c2=makeGaugeCard('m2','🚗','Windows-Down Drive','Open-air cruising comfort.',['Windows up','Borderline','Fun','Breezy bliss']); wrap.appendChild(c2);
-  setGauge('m2',s2,'Road-feel with windows down.',[R.t(curr.temp),R.dp(curr.dewpoint),R.pop(maxPop)]);
+  // ============ WINDOWS-DOWN DRIVE ============
+  // Nobody wants windows down below ~50°F or above ~85°F
+  let s2 = 100;
+  
+  // Cold penalties (very aggressive — freezing = no way)
+  if (curr.temp < 55) s2 -= (55 - curr.temp) * 3;
+  if (curr.temp < 45) s2 -= (45 - curr.temp) * 4;
+  if (curr.temp < 35) s2 -= (35 - curr.temp) * 5;
+  if (curr.temp <= 32) s2 = Math.min(s2, 3);           // Freezing = basically 0
+  
+  // Hot penalties
+  if (curr.temp > 82) s2 -= (curr.temp - 82) * 2.5;
+  if (curr.temp > 90) s2 -= (curr.temp - 90) * 3;
+  
+  // Humidity penalty (sticky air sucks)
+  if (curr.dewpoint > 65) s2 -= (curr.dewpoint - 65) * 2;
+  if (curr.dewpoint > 72) s2 -= (curr.dewpoint - 72) * 3;
+  
+  // Rain kills it
+  s2 -= maxPop * 1.2;
+  
+  s2 = clamp(s2, 0, 100);
+  const c2 = makeGaugeCard('m2', '🚗', 'Windows-Down Drive', 'Open-air cruising comfort.', ['Windows up', 'Borderline', 'Fun', 'Breezy bliss']);
+  wrap.appendChild(c2);
+  const driveDesc = curr.temp <= 35 ? 'Way too cold — windows up!' : curr.temp < 50 ? 'Too chilly for windows down.' : curr.temp > 88 ? 'Too hot — blast the AC.' : 'Road-feel with windows down.';
+  setGauge('m2', s2, driveDesc, [R.t(curr.temp), R.dp(curr.dewpoint), R.pop(maxPop)]);
 
-  // Run Outside
-  let s3=100; if(curr.temp<40) s3-=(40-curr.temp)*2.5; if(curr.temp>78) s3-=(curr.temp-78)*3; if(curr.dewpoint>65) s3-=(curr.dewpoint-65)*2.5; if(maxWind>20) s3-=(maxWind-20)*3; s3-=maxPop*1.0; s3=clamp(s3,0,100);
-  const c3=makeGaugeCard('m3','🏃','Run Outside','Temp, humidity, wind & rain risk.',['Sluggish','Decent','Good','PR day']); wrap.appendChild(c3);
-  setGauge('m3',s3,'Running comfort for the next few hours.',[R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind),R.pop(maxPop)]);
+  // ============ RUN OUTSIDE ============
+  // Uses wind chill for cold, considers humidity for hot
+  let s3 = 100;
+  
+  // Use feels-like temp for running comfort
+  const runFeels = feelsLike;
+  
+  // Cold penalties (wind chill matters a lot for runners)
+  if (runFeels < 45) s3 -= (45 - runFeels) * 2;
+  if (runFeels < 32) s3 -= (32 - runFeels) * 3;
+  if (runFeels < 20) s3 -= (20 - runFeels) * 4;
+  if (runFeels < 10) s3 = Math.min(s3, 10);            // Dangerous cold
+  
+  // Hot penalties
+  if (curr.temp > 75) s3 -= (curr.temp - 75) * 2;
+  if (curr.temp > 85) s3 -= (curr.temp - 85) * 3;
+  
+  // Humidity makes hot worse
+  if (curr.dewpoint > 65) s3 -= (curr.dewpoint - 65) * 2.5;
+  if (curr.dewpoint > 72) s3 -= (curr.dewpoint - 72) * 3;
+  
+  // Wind penalty (beyond what's in wind chill — gusty = annoying)
+  if (maxWind > 20) s3 -= (maxWind - 20) * 2;
+  if (maxWind > 30) s3 -= (maxWind - 30) * 3;
+  
+  // Rain
+  s3 -= maxPop * 0.8;
+  
+  s3 = clamp(s3, 0, 100);
+  const c3 = makeGaugeCard('m3', '🏃', 'Run Outside', 'Temp, humidity, wind & rain risk.', ['Sluggish', 'Decent', 'Good', 'PR day']);
+  wrap.appendChild(c3);
+  const runDesc = runFeels < 25 ? 'Dangerously cold — bundle up or stay in.' : runFeels < 40 ? 'Cold run — dress in layers.' : runFeels > 85 ? 'Heat risk — hydrate and take it easy.' : 'Running comfort for the next few hours.';
+  setGauge('m3', s3, runDesc, [R.t(curr.temp), R.feels(feelsLike), R.dp(curr.dewpoint), R.wind(maxWind), R.pop(maxPop)]);
 
-  // Clothes Comfort (CHANGED: humidity + wind penalties)
-  let s4=100;
-  if(curr.temp<60) s4-=(60-curr.temp)*1.2;
-  if(curr.temp>80) s4-=(curr.temp-80)*1.5;
-  if(curr.dewpoint>62) s4-=(curr.dewpoint-62)*2.0;     /* changed */
-  if(maxWind>18) s4-=(maxWind-18)*1.5;                 /* changed */
-  s4=clamp(s4,0,100);
-  const wear=suggestClothes(curr.temp); const c4=makeGaugeCard('m4','👕','Clothes Comfort',wear,['Bundled','Layered','Light','T-shirt']); wrap.appendChild(c4);
-  setGauge('m4',s4, wear, [R.t(curr.temp),R.dp(curr.dewpoint),R.wind(maxWind)]);
+  // ============ CLOTHES COMFORT ============
+  // How pleasant is it to be outside in normal clothes?
+  let s4 = 100;
+  
+  // Use feels-like for the experience
+  const clothesFeels = feelsLike;
+  
+  // Cold penalties
+  if (clothesFeels < 55) s4 -= (55 - clothesFeels) * 2;
+  if (clothesFeels < 40) s4 -= (40 - clothesFeels) * 2.5;
+  if (clothesFeels < 25) s4 -= (25 - clothesFeels) * 3;
+  if (clothesFeels < 15) s4 = Math.min(s4, 8);
+  
+  // Hot penalties
+  if (curr.temp > 80) s4 -= (curr.temp - 80) * 1.5;
+  if (curr.temp > 90) s4 -= (curr.temp - 90) * 2.5;
+  
+  // Humidity penalty
+  if (curr.dewpoint > 62) s4 -= (curr.dewpoint - 62) * 2;
+  if (curr.dewpoint > 70) s4 -= (curr.dewpoint - 70) * 2.5;
+  
+  // Wind makes cold worse (already in feelsLike, but gusty is extra annoying)
+  if (curr.temp < 50 && maxWind > 12) s4 -= (maxWind - 12) * 1.5;
+  
+  s4 = clamp(s4, 0, 100);
+  const wear = suggestClothes(curr.temp, feelsLike);
+  const c4 = makeGaugeCard('m4', '👕', 'Clothes Comfort', wear, ['Bundled', 'Layered', 'Light', 'T-shirt']);
+  wrap.appendChild(c4);
+  setGauge('m4', s4, wear, [R.t(curr.temp), R.feels(feelsLike), R.dp(curr.dewpoint), R.wind(maxWind)]);
 }
 
 /* ========= Local panel ========= */
@@ -412,8 +529,8 @@ async function updateLocal(){
     let rating='',color='';
     if(score>=80){rating='🔥🔥🔥';color='#10b981';}
     else if(score>=60){rating='🔥🔥';color='#f59e0b';}
-    else if(score>=40){rating='🔥';color:'#64748b';}
-    else {rating='❌';color:'#dc2626';}
+    else if(score>=40){rating='🔥';color='#64748b';}
+    else {rating='❌';color='#dc2626';}
 
     const el=document.createElement('div');
     el.className='bucket'; el.style.minWidth='110px';
