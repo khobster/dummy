@@ -14,6 +14,9 @@
     :root{
       --red:#dc2626; --blue:#3b82f6; --green:#10b981; --amber:#f59e0b;
       --gray:#f3f4f6; --dark:#0f172a; --muted:#64748b; --card:#ffffff; --tooltip:#111827;
+      /* Dew point comfort zones */
+      --dp-dry:#dbeafe; --dp-comfy:#dcfce7; --dp-mild:#fef9c3;
+      --dp-humid:#fed7aa; --dp-sticky:#fecaca; --dp-oppressive:#fca5a5;
     }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--gray);color:var(--dark)}
@@ -71,6 +74,39 @@
     .badge{font-size:.72rem;line-height:1;border-radius:999px;padding:.22rem .45rem;border:1px solid #e2e8f0;background:#fff}
     .badge.negative{border-color:#fecaca;background:#fff1f2}
     .badge.positive{border-color:#bbf7d0;background:#f0fdf4}
+
+    /* ===== Dew point detailed forecast ===== */
+    .dp-header{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;flex-wrap:wrap;margin-top:1rem}
+    .dp-header h4{font-size:1rem;margin:0;font-weight:800}
+    .dp-header p{color:var(--muted);margin:.15rem 0 0;font-size:.82rem}
+    .dp-legend{display:flex;flex-wrap:wrap;gap:.3rem;justify-content:flex-end}
+    .dp-zone{font-size:.7rem;padding:.2rem .55rem;border-radius:999px;border:1px solid #e2e8f0;color:#1e293b;white-space:nowrap}
+
+    .dew-chart{background:#f8fafc;border:1px solid #e2e8f0;border-radius:.75rem;padding:.5rem;margin:.6rem 0;overflow:hidden}
+    .dew-chart svg{display:block;width:100%;height:auto}
+
+    .dew-day-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem;margin-top:.5rem}
+    .dew-day-card{background:#fff;border:1px solid #e2e8f0;border-radius:.75rem;padding:.7rem;display:flex;flex-direction:column;gap:.45rem}
+    .dew-day-head{display:flex;justify-content:space-between;align-items:center;font-size:.9rem}
+    .dew-day-head strong{font-weight:800;letter-spacing:-.01em}
+    .dew-trend{font-size:.72rem;font-weight:700;padding:.18rem .45rem;border-radius:999px;background:#f1f5f9}
+    .dew-trend.up{color:#dc2626;background:#fef2f2}
+    .dew-trend.down{color:#2563eb;background:#eff6ff}
+    .dew-trend.flat{color:#475569}
+
+    .dew-day-range{display:flex;align-items:center;gap:.45rem;font-size:.72rem}
+    .dew-range-bar{flex:1;height:5px;border-radius:3px;background:linear-gradient(90deg,#3b82f6,#10b981,#f59e0b,#dc2626);position:relative;overflow:hidden}
+    .dew-range-bar::before{content:'';position:absolute;inset:0;background:rgba(255,255,255,.5)}
+    .dew-range-bar::after{content:'';position:absolute;top:0;bottom:0;left:var(--lo,0%);right:calc(100% - var(--hi,100%));background:linear-gradient(90deg,#3b82f6,#10b981,#f59e0b,#dc2626);background-size:200% 100%;background-position:var(--bg,0%) 0;border-radius:3px}
+    .dew-min{font-weight:800;color:#3b82f6;min-width:30px;text-align:right}
+    .dew-max{font-weight:800;color:#dc2626;min-width:30px}
+
+    .dew-blocks{display:grid;grid-template-columns:1fr 1fr;gap:.3rem}
+    .dew-block{background:#f8fafc;border:1px solid #e2e8f0;border-radius:.5rem;padding:.35rem;text-align:center}
+    .dew-block-name{font-size:.62rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.04em}
+    .dew-block-time{font-size:.58rem;color:#94a3b8;margin-bottom:.15rem}
+    .dew-block-val{font-size:1.05rem;font-weight:900;color:#0f172a;border-radius:.35rem;padding:.18rem 0}
+    .dew-day-summary{font-size:.72rem;color:#475569;font-style:italic;line-height:1.3;border-top:1px solid #f1f5f9;padding-top:.4rem}
 
     /* ===== Radar toolbar + telestrator ===== */
     .toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.25rem 0 0}
@@ -131,10 +167,25 @@
       <h3 style="margin-top:1rem">Dew Point Forecast</h3>
       <p style="color:var(--muted);margin:.25rem 0 .5rem">Next 12 hours</p>
       <div id="dewTimeline" class="timeline"></div>
-      <p style="color:var(--muted);margin:.5rem 0 .25rem">Next 5 days (min / max)</p>
-      <div id="dewDays" class="timeline"></div>
 
-      <h3 style="margin-top:1rem">Fire Pit Forecast</h3>
+      <div class="dp-header">
+        <div>
+          <h4>7-Day Outlook</h4>
+          <p>Hourly trajectory with comfort zones — color bands show how it'll feel</p>
+        </div>
+        <div class="dp-legend">
+          <span class="dp-zone" style="background:var(--dp-dry)">Dry &lt;40°</span>
+          <span class="dp-zone" style="background:var(--dp-comfy)">Comfy 40–55°</span>
+          <span class="dp-zone" style="background:var(--dp-mild)">Mild 55–60°</span>
+          <span class="dp-zone" style="background:var(--dp-humid)">Humid 60–65°</span>
+          <span class="dp-zone" style="background:var(--dp-sticky)">Sticky 65–70°</span>
+          <span class="dp-zone" style="background:var(--dp-oppressive)">Oppressive 70°+</span>
+        </div>
+      </div>
+      <div id="dewChart" class="dew-chart"></div>
+      <div id="dewDetailDays" class="dew-day-grid"></div>
+
+      <h3 style="margin-top:1.5rem">Fire Pit Forecast</h3>
       <p style="color:var(--muted);margin:.25rem 0 .5rem">Best evenings this week for outdoor fires</p>
       <div id="fireDays" class="timeline"></div>
 
@@ -208,6 +259,42 @@ function vpd(tF,rh){const C=(tF-32)*5/9;const svp=0.6108*Math.exp(17.27*C/(C+237
 function dewpointFromTRH(tF, rh){const tC=(tF-32)*5/9;const a=17.625,b=243.04;const g=Math.log(Math.max(1e-6,rh/100))+(a*tC)/(b+tC);const dC=(b*g)/(a-g);return dC*9/5+32;}
 const dateKeyInTz=(iso,tz)=> new Date(iso).toLocaleDateString('en-CA',{timeZone:tz});
 const todayKeyInTz=(tz)=> new Date().toLocaleDateString('en-CA',{timeZone:tz});
+const hourInTz=(iso,tz)=> parseInt(new Date(iso).toLocaleString('en-US',{hour:'2-digit',hour12:false,timeZone:tz}),10);
+
+/* Dew point comfort helpers */
+function dpColor(dp){
+  if(dp<40) return 'var(--dp-dry)';
+  if(dp<55) return 'var(--dp-comfy)';
+  if(dp<60) return 'var(--dp-mild)';
+  if(dp<65) return 'var(--dp-humid)';
+  if(dp<70) return 'var(--dp-sticky)';
+  return 'var(--dp-oppressive)';
+}
+function dpColorHex(dp){
+  if(dp<40) return '#dbeafe';
+  if(dp<55) return '#dcfce7';
+  if(dp<60) return '#fef9c3';
+  if(dp<65) return '#fed7aa';
+  if(dp<70) return '#fecaca';
+  return '#fca5a5';
+}
+function dpFeel(dp){
+  if(dp<40) return 'dry';
+  if(dp<55) return 'comfortable';
+  if(dp<60) return 'slightly humid';
+  if(dp<65) return 'humid';
+  if(dp<70) return 'sticky';
+  return 'oppressive';
+}
+function daySummaryText(avg, min, max){
+  const range = max - min;
+  const feel = dpFeel(avg);
+  let s = `Mostly ${feel}`;
+  if(range >= 15) s += `, big swing (${range}°)`;
+  else if(range >= 8) s += `, moderate swing`;
+  else s += `, steady`;
+  return s + '.';
+}
 
 /* Wind chill calculation (NWS formula, valid for T <= 50°F and wind >= 3 mph) */
 function windChill(tF, windMph) {
@@ -252,7 +339,7 @@ class Weather{
     return {temp:72,dewpoint:55,humidity:50,pressure:1013,wind:5,timestamp:new Date(),source:'Fallback'};
   }
   async hourly(lat,lon){
-    const j=await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=dew_point_2m&hourly=dew_point_2m,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,cloud_cover&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`,9000);
+    const j=await fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=dew_point_2m&hourly=dew_point_2m,temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation_probability,cloud_cover&temperature_unit=fahrenheit&wind_speed_unit=mph&forecast_days=7&timezone=auto`,9000);
     const hours=(j.hourly.time||[]).map((t,i)=>{
       const temp=Math.round(j.hourly.temperature_2m?.[i]??NaN);
       const rh=j.hourly.relative_humidity_2m?.[i]??null;
@@ -333,55 +420,33 @@ function renderOutcomeMeters(curr, next6){
   };
 
   // ============ WINDOWS OPEN ============
-  // Ideal: 60-78°F, low humidity, light wind
   let s1 = 100;
-  
-  // Cold penalties (aggressive)
-  if (curr.temp < 55) s1 -= (55 - curr.temp) * 4;      // Below 55 gets bad fast
-  if (curr.temp < 45) s1 -= (45 - curr.temp) * 3;      // Extra penalty below 45
-  if (curr.temp < 32) s1 = Math.min(s1, 5);            // Freezing = basically 0
-  
-  // Hot penalties
+  if (curr.temp < 55) s1 -= (55 - curr.temp) * 4;
+  if (curr.temp < 45) s1 -= (45 - curr.temp) * 3;
+  if (curr.temp < 32) s1 = Math.min(s1, 5);
   if (curr.temp > 78) s1 -= (curr.temp - 78) * 2;
   if (curr.temp > 85) s1 -= (curr.temp - 85) * 3;
-  
-  // Humidity penalties
   if (curr.dewpoint < 35) s1 -= (35 - curr.dewpoint) * 1.5;
   if (curr.dewpoint > 60) s1 -= (curr.dewpoint - 60) * 4;
   if (curr.dewpoint >= 70) s1 = Math.min(s1, 15);
-  
-  // Wind penalty (drafty)
   if (maxWind > 15) s1 -= (maxWind - 15) * 2;
-  
-  // Rain penalty
   s1 -= (maxPop || 0) * 0.6;
-  
   s1 = clamp(s1, 0, 100);
   const c1 = makeGaugeCard('m1', '🪟', 'Windows Open', 'Comfort with outside air in the house.', ['gosh no', 'meh', 'nice', 'perfect']);
   wrap.appendChild(c1);
   setGauge('m1', s1, curr.temp < 50 ? 'Too cold for open windows.' : curr.temp > 82 ? 'Too hot — use AC.' : 'Comfort window for the next few hours.', [R.t(curr.temp), R.dp(curr.dewpoint), R.wind(maxWind), R.pop(maxPop)]);
 
   // ============ WINDOWS-DOWN DRIVE ============
-  // Nobody wants windows down below ~50°F or above ~85°F
   let s2 = 100;
-  
-  // Cold penalties (very aggressive — freezing = no way)
   if (curr.temp < 55) s2 -= (55 - curr.temp) * 3;
   if (curr.temp < 45) s2 -= (45 - curr.temp) * 4;
   if (curr.temp < 35) s2 -= (35 - curr.temp) * 5;
-  if (curr.temp <= 32) s2 = Math.min(s2, 3);           // Freezing = basically 0
-  
-  // Hot penalties
+  if (curr.temp <= 32) s2 = Math.min(s2, 3);
   if (curr.temp > 82) s2 -= (curr.temp - 82) * 2.5;
   if (curr.temp > 90) s2 -= (curr.temp - 90) * 3;
-  
-  // Humidity penalty (sticky air sucks)
   if (curr.dewpoint > 65) s2 -= (curr.dewpoint - 65) * 2;
   if (curr.dewpoint > 72) s2 -= (curr.dewpoint - 72) * 3;
-  
-  // Rain kills it
   s2 -= maxPop * 1.2;
-  
   s2 = clamp(s2, 0, 100);
   const c2 = makeGaugeCard('m2', '🚗', 'Windows-Down Drive', 'Open-air cruising comfort.', ['Windows up', 'Borderline', 'Fun', 'Breezy bliss']);
   wrap.appendChild(c2);
@@ -389,33 +454,19 @@ function renderOutcomeMeters(curr, next6){
   setGauge('m2', s2, driveDesc, [R.t(curr.temp), R.dp(curr.dewpoint), R.pop(maxPop)]);
 
   // ============ RUN OUTSIDE ============
-  // Uses wind chill for cold, considers humidity for hot
   let s3 = 100;
-  
-  // Use feels-like temp for running comfort
   const runFeels = feelsLike;
-  
-  // Cold penalties (wind chill matters a lot for runners)
   if (runFeels < 45) s3 -= (45 - runFeels) * 2;
   if (runFeels < 32) s3 -= (32 - runFeels) * 3;
   if (runFeels < 20) s3 -= (20 - runFeels) * 4;
-  if (runFeels < 10) s3 = Math.min(s3, 10);            // Dangerous cold
-  
-  // Hot penalties
+  if (runFeels < 10) s3 = Math.min(s3, 10);
   if (curr.temp > 75) s3 -= (curr.temp - 75) * 2;
   if (curr.temp > 85) s3 -= (curr.temp - 85) * 3;
-  
-  // Humidity makes hot worse
   if (curr.dewpoint > 65) s3 -= (curr.dewpoint - 65) * 2.5;
   if (curr.dewpoint > 72) s3 -= (curr.dewpoint - 72) * 3;
-  
-  // Wind penalty (beyond what's in wind chill — gusty = annoying)
   if (maxWind > 20) s3 -= (maxWind - 20) * 2;
   if (maxWind > 30) s3 -= (maxWind - 30) * 3;
-  
-  // Rain
   s3 -= maxPop * 0.8;
-  
   s3 = clamp(s3, 0, 100);
   const c3 = makeGaugeCard('m3', '🏃', 'Run Outside', 'Temp, humidity, wind & rain risk.', ['Sluggish', 'Decent', 'Good', 'PR day']);
   wrap.appendChild(c3);
@@ -423,34 +474,263 @@ function renderOutcomeMeters(curr, next6){
   setGauge('m3', s3, runDesc, [R.t(curr.temp), R.feels(feelsLike), R.dp(curr.dewpoint), R.wind(maxWind), R.pop(maxPop)]);
 
   // ============ CLOTHES COMFORT ============
-  // How pleasant is it to be outside in normal clothes?
   let s4 = 100;
-  
-  // Use feels-like for the experience
   const clothesFeels = feelsLike;
-  
-  // Cold penalties
   if (clothesFeels < 55) s4 -= (55 - clothesFeels) * 2;
   if (clothesFeels < 40) s4 -= (40 - clothesFeels) * 2.5;
   if (clothesFeels < 25) s4 -= (25 - clothesFeels) * 3;
   if (clothesFeels < 15) s4 = Math.min(s4, 8);
-  
-  // Hot penalties
   if (curr.temp > 80) s4 -= (curr.temp - 80) * 1.5;
   if (curr.temp > 90) s4 -= (curr.temp - 90) * 2.5;
-  
-  // Humidity penalty
   if (curr.dewpoint > 62) s4 -= (curr.dewpoint - 62) * 2;
   if (curr.dewpoint > 70) s4 -= (curr.dewpoint - 70) * 2.5;
-  
-  // Wind makes cold worse (already in feelsLike, but gusty is extra annoying)
   if (curr.temp < 50 && maxWind > 12) s4 -= (maxWind - 12) * 1.5;
-  
   s4 = clamp(s4, 0, 100);
   const wear = suggestClothes(curr.temp, feelsLike);
   const c4 = makeGaugeCard('m4', '👕', 'Clothes Comfort', wear, ['Bundled', 'Layered', 'Light', 'T-shirt']);
   wrap.appendChild(c4);
   setGauge('m4', s4, wear, [R.t(curr.temp), R.feels(feelsLike), R.dp(curr.dewpoint), R.wind(maxWind)]);
+}
+
+/* ========= NEW: 7-day dew point chart ========= */
+function renderDewChart(hours, tz){
+  const container = document.getElementById('dewChart');
+  if(!hours || !hours.length){ container.innerHTML=''; return; }
+
+  // Use the next ~168 hours (7 days) from now forward; if we don't have 168, use what we have
+  const nowMs = Date.now();
+  let series = hours.filter(h => new Date(h.time).getTime() >= nowMs - 60*60*1000);
+  series = series.slice(0, 168);
+  if(series.length < 4){ container.innerHTML='<p style="color:var(--muted);padding:.5rem">Not enough forecast data yet.</p>'; return; }
+
+  const dps = series.map(h=>h.dp);
+  const dataMin = Math.min(...dps), dataMax = Math.max(...dps);
+  // Round to nearest 10, give 5° headroom on each side, clamp to reasonable range
+  const yMin = Math.max(-20, Math.floor((dataMin-5)/10)*10);
+  const yMax = Math.min(95, Math.ceil((dataMax+5)/10)*10);
+  const yRange = Math.max(20, yMax - yMin);
+
+  const W=1100, H=280;
+  const padL=40, padR=12, padT=14, padB=34;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  const xAt = i => padL + (i/(series.length-1)) * innerW;
+  const yAt = v => padT + (1 - (v - yMin)/yRange) * innerH;
+
+  // Comfort zone bands
+  const zones = [
+    {min: -50, max: 40,  color: '#dbeafe'},
+    {min: 40,  max: 55,  color: '#dcfce7'},
+    {min: 55,  max: 60,  color: '#fef9c3'},
+    {min: 60,  max: 65,  color: '#fed7aa'},
+    {min: 65,  max: 70,  color: '#fecaca'},
+    {min: 70,  max: 120, color: '#fca5a5'}
+  ];
+  let bandsSvg = '';
+  zones.forEach(z => {
+    const top = yAt(Math.min(z.max, yMax));
+    const bot = yAt(Math.max(z.min, yMin));
+    if(bot > top){
+      bandsSvg += `<rect x="${padL}" y="${top.toFixed(1)}" width="${innerW}" height="${(bot-top).toFixed(1)}" fill="${z.color}" opacity="0.5"/>`;
+    }
+  });
+
+  // Y-axis grid lines and labels (every 10°)
+  let yAxis = '';
+  for(let v = Math.ceil(yMin/10)*10; v <= yMax; v += 10){
+    const yy = yAt(v);
+    yAxis += `<line x1="${padL}" x2="${W-padR}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="2,3"/>`;
+    yAxis += `<text x="${padL-6}" y="${(yy+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#64748b" font-family="system-ui">${v}°</text>`;
+  }
+
+  // Day separator lines + day labels (centered between separators)
+  let dayMarks = '';
+  const dayBoundaries = []; // indices where a new day starts
+  let lastDay = '';
+  series.forEach((h, i) => {
+    const k = dateKeyInTz(h.time, tz);
+    if(k !== lastDay){ dayBoundaries.push({idx:i, key:k, time:h.time}); lastDay = k; }
+  });
+  dayBoundaries.push({idx: series.length-1}); // end sentinel
+
+  for(let b = 0; b < dayBoundaries.length - 1; b++){
+    const start = dayBoundaries[b];
+    const end = dayBoundaries[b+1];
+    const startX = xAt(start.idx);
+    const endX = xAt(end.idx);
+    // separator (not for the very first day)
+    if(b > 0){
+      dayMarks += `<line x1="${startX.toFixed(1)}" x2="${startX.toFixed(1)}" y1="${padT}" y2="${padT+innerH}" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>`;
+    }
+    // label centered in this day's span
+    const label = new Date(start.time).toLocaleDateString('en-US', {weekday:'short', timeZone:tz});
+    const labelX = (startX + endX) / 2;
+    if(endX - startX > 30){ // skip label if span too narrow
+      dayMarks += `<text x="${labelX.toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="11" font-weight="700" fill="#0f172a" font-family="system-ui">${label}</text>`;
+    }
+  }
+
+  // Area fill (subtle gradient down to bottom)
+  const linePts = series.map((h,i) => `${xAt(i).toFixed(1)},${yAt(h.dp).toFixed(1)}`);
+  const areaPath = `M ${xAt(0).toFixed(1)},${(padT+innerH).toFixed(1)} L ${linePts.join(' L ')} L ${xAt(series.length-1).toFixed(1)},${(padT+innerH).toFixed(1)} Z`;
+  const linePath = `M ${linePts.join(' L ')}`;
+
+  // Current time marker (vertical line at "now")
+  let nowMarker = '';
+  // Find the closest series index to current time
+  let nearestIdx = 0; let bestDelta = Infinity;
+  series.forEach((h,i) => {
+    const d = Math.abs(new Date(h.time).getTime() - nowMs);
+    if(d < bestDelta){ bestDelta = d; nearestIdx = i; }
+  });
+  const nowX = xAt(nearestIdx);
+  const nowY = yAt(series[nearestIdx].dp);
+  nowMarker = `
+    <line x1="${nowX.toFixed(1)}" x2="${nowX.toFixed(1)}" y1="${padT}" y2="${padT+innerH}" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.7"/>
+    <circle cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="5" fill="#dc2626" stroke="#fff" stroke-width="2"/>
+    <text x="${nowX.toFixed(1)}" y="${(padT-2).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626" font-family="system-ui">NOW ${series[nearestIdx].dp}°</text>
+  `;
+
+  // Min/max annotations
+  const minIdx = dps.indexOf(dataMin);
+  const maxIdx = dps.indexOf(dataMax);
+  let annotations = '';
+  if(maxIdx !== nearestIdx){
+    const mx = xAt(maxIdx), my = yAt(dataMax);
+    annotations += `<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3" fill="#0f172a"/>`;
+    annotations += `<text x="${mx.toFixed(1)}" y="${(my-7).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#0f172a" font-family="system-ui">${dataMax}°</text>`;
+  }
+  if(minIdx !== nearestIdx && minIdx !== maxIdx){
+    const nx = xAt(minIdx), ny = yAt(dataMin);
+    annotations += `<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="3" fill="#0f172a"/>`;
+    annotations += `<text x="${nx.toFixed(1)}" y="${(ny+14).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="#0f172a" font-family="system-ui">${dataMin}°</text>`;
+  }
+
+  const svg = `
+    <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="dewArea" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#0f172a" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${bandsSvg}
+      ${yAxis}
+      <path d="${areaPath}" fill="url(#dewArea)" stroke="none"/>
+      <path d="${linePath}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dayMarks}
+      ${annotations}
+      ${nowMarker}
+    </svg>
+  `;
+  container.innerHTML = svg;
+}
+
+/* ========= NEW: per-day detailed dew point cards ========= */
+function renderDewDetailDays(hours, tz){
+  const wrap = document.getElementById('dewDetailDays');
+  wrap.innerHTML = '';
+  if(!hours || !hours.length) return;
+
+  const startKey = todayKeyInTz(tz);
+  const groups = new Map();
+  hours.forEach(h => {
+    const k = dateKeyInTz(h.time, tz);
+    if(k >= startKey){
+      if(!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(h);
+    }
+  });
+  const dayKeys = [...groups.keys()].sort().slice(0, 7);
+
+  // Time blocks (in local hours per tz)
+  const blockDefs = [
+    {name:'Morning',   label:'6a–12p', start:6,  end:12},
+    {name:'Afternoon', label:'12p–6p', start:12, end:18},
+    {name:'Evening',   label:'6p–10p', start:18, end:22},
+    {name:'Overnight', label:'10p–6a', start:22, end:30}  // wraps; we handle below
+  ];
+
+  let prevAvg = null;
+  dayKeys.forEach(k => {
+    const arr = groups.get(k) || [];
+    if(!arr.length) return;
+
+    const dps = arr.map(h=>h.dp);
+    const dayMin = Math.min(...dps);
+    const dayMax = Math.max(...dps);
+    const dayAvg = Math.round(dps.reduce((a,b)=>a+b,0) / dps.length);
+
+    // Per-block averages
+    const blockData = blockDefs.map(b => {
+      let items;
+      if(b.end > 24){
+        // overnight: 22-23 of THIS day OR 0-5 of NEXT day. We only have today's arr here,
+        // so just take 22-23 from this day plus 0-5 from the next day if it exists in groups.
+        const todayLate = arr.filter(h => {
+          const hr = hourInTz(h.time, tz);
+          return hr >= 22;
+        });
+        const nextKey = dayKeys[dayKeys.indexOf(k)+1];
+        const nextEarly = nextKey ? (groups.get(nextKey)||[]).filter(h => hourInTz(h.time, tz) < 6) : [];
+        items = [...todayLate, ...nextEarly];
+      } else {
+        items = arr.filter(h => {
+          const hr = hourInTz(h.time, tz);
+          return hr >= b.start && hr < b.end;
+        });
+      }
+      if(!items.length) return null;
+      const avg = Math.round(items.reduce((a,h)=>a+h.dp,0) / items.length);
+      return {name:b.name, label:b.label, avg};
+    }).filter(Boolean);
+
+    // Trend vs previous day's avg
+    let trendHtml = '';
+    if(prevAvg !== null){
+      const diff = dayAvg - prevAvg;
+      if(diff >= 3) trendHtml = `<span class="dew-trend up">↑ +${diff}°</span>`;
+      else if(diff <= -3) trendHtml = `<span class="dew-trend down">↓ ${diff}°</span>`;
+      else trendHtml = `<span class="dew-trend flat">→ ${diff>0?'+':''}${diff}°</span>`;
+    } else {
+      trendHtml = `<span class="dew-trend flat">today</span>`;
+    }
+    prevAvg = dayAvg;
+
+    // Day label
+    const dayLabel = new Date(k+'T12:00:00').toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', timeZone: tz});
+
+    // Range bar fill: normalize across reasonable dewpoint range (0-80°F)
+    const rangeFloor = 0, rangeCeil = 80;
+    const loPct = Math.max(0, Math.min(100, ((dayMin - rangeFloor) / (rangeCeil-rangeFloor)) * 100));
+    const hiPct = Math.max(0, Math.min(100, ((dayMax - rangeFloor) / (rangeCeil-rangeFloor)) * 100));
+
+    const blocksHtml = blockData.map(b => `
+      <div class="dew-block">
+        <div class="dew-block-name">${b.name}</div>
+        <div class="dew-block-time">${b.label}</div>
+        <div class="dew-block-val" style="background:${dpColorHex(b.avg)}">${b.avg}°</div>
+      </div>
+    `).join('');
+
+    const card = document.createElement('div');
+    card.className = 'dew-day-card';
+    card.innerHTML = `
+      <div class="dew-day-head">
+        <strong>${dayLabel}</strong>
+        ${trendHtml}
+      </div>
+      <div class="dew-day-range">
+        <span class="dew-min">${dayMin}°</span>
+        <div class="dew-range-bar" style="--lo:${loPct}%;--hi:${hiPct}%"></div>
+        <span class="dew-max">${dayMax}°</span>
+      </div>
+      <div class="dew-blocks">${blocksHtml}</div>
+      <div class="dew-day-summary">${daySummaryText(dayAvg, dayMin, dayMax)}</div>
+    `;
+    wrap.appendChild(card);
+  });
 }
 
 /* ========= Local panel ========= */
@@ -471,7 +751,6 @@ async function updateLocal(){
               :spread<10?'Very humid — condensation risk'
               :spread<20?'Comfortable moisture'
               :'Dry air — static likely';
-  // VPD interpretation based on spread (temp-independent) rather than absolute VPD
   const vpdDesc = spread < 3 ? 'saturated — fog/condensation' 
                 : spread < 8 ? 'humid'
                 : spread < 15 ? 'comfortable'
@@ -485,6 +764,7 @@ async function updateLocal(){
   const bias=clamp(biasRaw,-8,8);
   const corrected=fc.hours.map((h,i)=>({...h, dp: Math.round(clamp(h.dp + (i<18?1:(i<48?0.6:0.3))*bias, -40, 85))}));
 
+  // Next 12 hours timeline (unchanged)
   const tl=document.getElementById('dewTimeline'); tl.innerHTML='';
   const now=new Date();
   const next12=corrected.filter(h=>new Date(h.time)>now).slice(0,12);
@@ -495,17 +775,15 @@ async function updateLocal(){
   });
 
   const tz=fc.tz||'UTC'; const startKey=todayKeyInTz(tz);
+
+  // NEW: 7-day chart + per-day detail cards
+  renderDewChart(corrected, tz);
+  renderDewDetailDays(corrected, tz);
+
+  // Fire pit forecast (unchanged)
   const groups=new Map();
   corrected.forEach(h=>{ const k=dateKeyInTz(h.time,tz); if(k>=startKey){ if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(h); }});
   const dayKeys=[...groups.keys()].sort();
-  const days=document.getElementById('dewDays'); days.innerHTML='';
-  dayKeys.slice(0,5).forEach(k=>{
-    const arr=groups.get(k)||[]; if(!arr.length) return;
-    const min=Math.min(...arr.map(x=>x.dp)), max=Math.max(...arr.map(x=>x.dp));
-    const el=document.createElement('div'); el.className='bucket';
-    el.innerHTML=`<strong>${new Date(k+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',timeZone:tz})}</strong><div class="tval">${min}° – ${max}°</div><div class="mini">min / max dew</div>`;
-    days.appendChild(el);
-  });
 
   const fireEl=document.getElementById('fireDays'); fireEl.innerHTML='';
   dayKeys.forEach(k=>{
@@ -644,7 +922,6 @@ function setActiveTool(id){
 }
 function startDraw(e){
   if(!maps.radar) return;
-  // Disable map interactions while drawing
   maps.radar.dragging.disable();
   maps.radar.doubleClickZoom.disable();
   maps.radar.scrollWheelZoom.disable();
@@ -667,7 +944,6 @@ function moveDraw(e){
 }
 function endDraw(e){
   if(!drawState){
-    // ensure interactions are enabled
     maps.radar.dragging.enable();
     maps.radar.doubleClickZoom.enable();
     maps.radar.scrollWheelZoom.enable();
@@ -687,7 +963,6 @@ function endDraw(e){
   }else{ shapes.push(drawState.shape); }
 
   drawState=null;
-  // Re-enable interactions after drawing
   maps.radar.dragging.enable();
   maps.radar.doubleClickZoom.enable();
   maps.radar.scrollWheelZoom.enable();
@@ -697,7 +972,6 @@ function endDraw(e){
 function bindTelestrator(){
   document.getElementById('tool-pen').onclick=()=>{ tool='pen'; setActiveTool('tool-pen'); };
   document.getElementById('tool-hand').onclick=()=>{ tool='hand'; setActiveTool('tool-hand');
-    // Fully enable map interactions in hand mode
     maps.radar.dragging.enable();
     maps.radar.doubleClickZoom.enable();
     maps.radar.scrollWheelZoom.enable();
@@ -713,9 +987,8 @@ function bindTelestrator(){
   document.getElementById('tool-undo').onclick=()=>{ const last=shapes.pop(); if(last){ drawLayer.removeLayer(last);} };
   document.getElementById('tool-clear').onclick=()=>{ drawLayer.clearLayers(); shapes=[]; };
 
-  // Skip drawing in hand mode; let Leaflet pan/zoom normally
   maps.radar.on('mousedown', e => {
-    if(tool==='hand') return; // pan/zoom only
+    if(tool==='hand') return;
     if(tool!=='text') startDraw(e); else { startDraw(e); endDraw(e); }
   });
   maps.radar.on('mousemove', moveDraw);
@@ -755,9 +1028,8 @@ window.setLocation=async function(){
   const input=document.getElementById('locationInput').value; const parts=input.split(',').map(s=>parseFloat(s.trim()));
   if(parts.length===2 && !isNaN(parts[0]) && !isNaN(parts[1])){
     userLocation={lat:parts[0],lon:parts[1]};
-    // update map views
     maps.local.setView([userLocation.lat,userLocation.lon],9);
-    if (maps.localMarker) maps.localMarker.setLatLng([userLocation.lat,userLocation.lon]); // keep pin in sync
+    if (maps.localMarker) maps.localMarker.setLatLng([userLocation.lat,userLocation.lon]);
     maps.radar.setView([userLocation.lat,userLocation.lon],7);
     await updateLocal(); await loadRadarFrames();
   }else alert('Enter as: latitude, longitude');
